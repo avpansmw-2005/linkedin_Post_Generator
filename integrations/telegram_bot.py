@@ -443,10 +443,13 @@ async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYP
         final_state = app.get_state(config).values
         post_url = final_state.get("linkedin_post_url", "")
         success_text = (
-            f"🎉 **Post Successfully Published!**\n\n"
-            f"🔗 **LinkedIn URL:** {post_url}"
+            f"🎉 <b>Post Successfully Published!</b>\n\n"
+            f"🔗 <b>LinkedIn URL:</b>\n{post_url}"
         )
-        await query.message.reply_text(success_text, parse_mode="Markdown")
+        try:
+            await query.message.reply_text(success_text, parse_mode="HTML")
+        except Exception:
+            await query.message.reply_text(f"🎉 Post Successfully Published!\n\n🔗 LinkedIn URL:\n{post_url}")
         ACTIVE_SESSIONS.pop(chat_id, None)
 
     elif action == "review_edit_prompt":
