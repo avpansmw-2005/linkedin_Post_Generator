@@ -42,10 +42,13 @@ def get_allowed_chat_id() -> int | None:
 
 
 def is_authorized(user_id: int) -> bool:
-    """Verifies whether the interacting user is authorized."""
+    """Verifies whether the interacting user is strictly authorized.
+    Fails closed: if TELEGRAM_ALLOWED_CHAT_ID is missing, denies all access.
+    """
     allowed = get_allowed_chat_id()
     if allowed is None:
-        return True  # If not set, permits interaction (prints chat ID in /start)
+        logger.error("SECURITY ALERT: TELEGRAM_ALLOWED_CHAT_ID is not configured in .env! Rejecting all requests.")
+        return False
     return user_id == allowed
 
 
@@ -55,17 +58,18 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     user_id = update.effective_user.id
-    allowed_id = get_allowed_chat_id()
-
-    auth_msg = (
-        "✅ **Authorized user**"
-        if is_authorized(user_id)
-        else f"⚠️ **Unauthorized user** (Your ID: `{user_id}`. Set `TELEGRAM_ALLOWED_CHAT_ID={user_id}` in `.env`)"
-    )
+    if not is_authorized(user_id):
+        logger.warning(
+            "SECURITY: Blocked unauthorized /start attempt from user_id=%s (@%s)",
+            user_id,
+            update.effective_user.username,
+        )
+        await update.effective_message.reply_text("⛔ Access Denied: This is a private bot.")
+        return
 
     help_text = (
         f"🤖 **Developer LinkedIn Content Bot**\n\n"
-        f"{auth_msg}\n\n"
+        f"🔒 **Security Status:** Authenticated (User ID: `{user_id}`)\n\n"
         f"**Available Commands:**\n"
         f"• `/topic [name]` — Search fresh stories on a specific topic (e.g. `/topic postgres`, `/topic docker`, `/topic rust`)\n"
         f"• `/random` — Pick a random fascinating developer topic and get fresh stories\n"
@@ -379,6 +383,12 @@ async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
 
     chat_id = update.effective_chat.id if update.effective_chat else 0
+    user_id = update.effective_user.id if update.effective_user else 0
+    if not is_authorized(user_id):
+        logger.warning("SECURITY: Unauthorized review action attempt from user_id=%s", user_id)
+        await query.message.reply_text("⛔ Unauthorized.")
+        return
+
     session = ACTIVE_SESSIONS.get(chat_id)
     if not session or session.get("current_gate") != "await_review":
         await query.message.reply_text("⚠️ No review currently awaiting action.")
