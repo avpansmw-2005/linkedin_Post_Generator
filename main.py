@@ -148,6 +148,22 @@ def main():
     parts = cron_expr.split()
 
     async def on_startup(app):
+        # 1. Register Telegram command menu button popup
+        from telegram import BotCommand
+        bot_commands = [
+            BotCommand("topic", "Search stories by topic (e.g. /topic postgres)"),
+            BotCommand("random", "Pick a random technical topic to explore"),
+            BotCommand("fetch", "Scan daily developer engineering blogs"),
+            BotCommand("status", "View current pipeline status"),
+            BotCommand("help", "Show bot commands and guide"),
+        ]
+        try:
+            await app.bot.set_my_commands(bot_commands)
+            logger.info("Telegram command menu button registered successfully.")
+        except Exception as e:
+            logger.warning("Could not register bot commands with Telegram: %s", e)
+
+        # 2. Start APScheduler if cron schedule configured
         if len(parts) == 5:
             minute, hour, day, month, day_of_week = parts
             scheduler.add_job(

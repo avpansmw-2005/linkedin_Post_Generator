@@ -50,3 +50,15 @@ def test_sample_fixtures_loaded():
         assert "title" in item
         assert "url" in item
         assert "source" in item
+
+
+def test_get_random_topic():
+    topic = fetcher.get_random_topic()
+    assert isinstance(topic, str)
+    assert len(topic) > 5
+
+
+def test_exclude_corporate_fluff():
+    assert not fetcher._is_relevant_developer_story("Startup raises $50M in seed funding round")
+    assert not fetcher._is_relevant_developer_story("BigTech CEO steps down after antitrust lawsuit")
+    assert fetcher._is_relevant_developer_story("Optimizing PostgreSQL query plans with indexing and btree")

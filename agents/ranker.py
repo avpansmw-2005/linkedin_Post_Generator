@@ -27,36 +27,23 @@ class TopFiveRanking(BaseModel):
     )
 
 
-RANKER_SYSTEM_PROMPT = """You are an experienced software developer and tech curator.
-Your task is to analyze candidate technical articles and pick the top 5 most valuable stories where a developer learns something genuinely interesting, practical, or eye-opening to share with fellow engineers on LinkedIn.
+RANKER_SYSTEM_PROMPT = """You are a Principal AI Systems Architect and technical thought leader.
+Your goal is to evaluate technical articles and select the highest-signal stories that an ambitious software engineer can share on LinkedIn to:
+1. Demonstrate deep, hands-on mastery of modern AI development (agent security, MCP protocols, sandboxing, inference optimization, RAG architectures, and production reliability).
+2. Position the author as an elite technical practitioner that high-growth tech companies, CTOs, and recruiters actively seek out and respect.
+3. Highlight actionable architecture insights, code execution boundaries, and system design patterns.
 
-Evaluation Criteria:
-1. Actionable Developer Learnings: Practical lessons, system design insights, performance optimizations, memory tricks, or new design patterns.
-2. Real-World Engineering Tools: Hands-on frameworks, libraries, open-source models, local tooling, and APIs (Python, TypeScript, SQLite, LangGraph, Docker, etc.).
-3. "Under the Hood" Depth: Explaining how things actually work under the hood instead of vague hype.
+Strictly Reject & Penalize:
+- Non-technical articles, buyer's guides, spam, promotional listicles, corporate PR, pricing/account services, and shallow fluff.
 
-Strictly Reject:
-- Venture capital funding rounds, company valuations, executive drama, lawsuits, and corporate PR.
-
-Return exactly 5 stories sorted by score descending. For each, give a clear 1-sentence developer takeaway."""
+Return the top stories sorted by score descending. For each story, provide a sharp, technically rigorous 1-sentence developer takeaway explaining the architectural insight."""
 
 
 def rank(items: list[NewsItem], top_k: int = 5) -> list[RankedItem]:
-    """Evaluates raw news items using the LLM client and returns the top 5 ranked items."""
+    """Evaluates raw news items using the LLM client and returns the top ranked items."""
     if not items:
         logger.warning("No news items provided to ranker.")
         return []
-
-    if len(items) <= top_k:
-        logger.info("Candidate count (%d) <= top_k (%d); assigning default scores", len(items), top_k)
-        return [
-            {
-                **item,
-                "score": 8.0,
-                "reason": f"Relevant AI development from {item.get('source', 'curated source')}.",
-            }
-            for item in items
-        ]
 
     # Format items for prompt
     candidates_text = []

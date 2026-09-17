@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import hashlib
 import sqlite3
 import logging
@@ -20,21 +21,27 @@ DEFAULT_TIMEOUT = 10.0
 # Developer learning & technical keywords
 DEV_KEYWORDS = {
     "python", "typescript", "javascript", "react", "nextjs", "fastapi", "golang", "rust",
-    "sqlite", "postgres", "redis", "docker", "kubernetes", "linux", "git", "github",
+    "sqlite", "postgres", "postgresql", "redis", "docker", "kubernetes", "linux", "git", "github",
+    "database", "databases", "indexing", "query", "sql", "nosql", "btree",
     "llm", "agent", "agents", "rag", "embeddings", "vllm", "ollama", "langchain", "langgraph",
-    "architecture", "system design", "benchmark", "benchmarks", "optimization", "performance",
+    "architecture", "system design", "benchmark", "benchmarks", "optimization", "optimizing", "performance",
     "tutorial", "guide", "how-to", "how to", "deep dive", "postmortem", "debugging",
     "open source", "open-source", "library", "sdk", "api", "framework", "release", "releases",
     "deepseek", "mistral", "claude", "openai", "speculative decoding", "transformer", "fine-tuning",
-    "prompt engineering", "context caching", "show hn", "developer", "engineering"
+    "prompt engineering", "context caching", "show hn", "developer", "engineering", "backend",
+    "security", "sandbox", "mcp", "firewall", "tokens", "inference", "evals"
 }
 
-# Negative keywords to filter out business/finance/drama noise
+# Negative keywords to filter out business/finance/drama and spam affiliate noise
 EXCLUDE_KEYWORDS = {
     "funding", "valuation", "raised $", "seed round", "series a", "series b", "series c",
     "layoffs", "laid off", "lawsuit", "sued", "antitrust", "crypto", "bitcoin",
     "quarterly earnings", "revenue", "stocks", "shares jump", "ceo steps down",
-    "ipo", "acquisition", "acquires", "billion acquisition"
+    "ipo", "acquisition", "acquires", "billion acquisition",
+    "buyer's guide", "buyers guide", "cheap", "stripe account", "stripe accounts",
+    "defence systems", "defense systems", "discount", "affiliate", "sites for cheap",
+    "best sites for", "buy cheap", "coupon", "voucher", "account 2026", "usa & uk accounts",
+    "price in", "buy online", "cheap and secure", "seo", "casino"
 }
 
 
@@ -212,31 +219,145 @@ def fetch_arxiv(max_results: int = 6) -> list[NewsItem]:
     return fetch_rss_feed(url, "arXiv Engineering", max_items=max_results)
 
 
-def fetch_all(db_path: str = SEEN_DB_PATH, deduplicate: bool = True) -> list[NewsItem]:
+RANDOM_DEV_TOPICS = [
+    "PostgreSQL performance and indexing",
+    "Docker optimization and container internals",
+    "Distributed systems and consensus protocols",
+    "Linux kernel and eBPF observability",
+    "Async Python and high-concurrency event loops",
+    "Rust systems programming and memory safety",
+    "LLM quantization and local model inference",
+    "LangGraph and autonomous agent architecture",
+    "Vector databases and hybrid semantic retrieval",
+    "Redis caching patterns and memory efficiency",
+    "WebAssembly in production and edge computing",
+    "TypeScript advanced type gymnastics",
+    "FastAPI architecture and async IO benchmarks",
+    "Kafka and event streaming reliability",
+    "System design and high-scale architecture postmortems",
+]
+
+
+def get_random_topic() -> str:
+    """Selects a random high-signal technical developer topic."""
+    import random
+    return random.choice(RANDOM_DEV_TOPICS)
+
+
+STOPWORDS = {
+    "how", "can", "we", "i", "you", "they", "our", "my", "your", "as", "a", "an",
+    "the", "is", "are", "was", "were", "to", "for", "in", "on", "at", "by", "from",
+    "with", "about", "what", "why", "when", "where", "which", "who", "do", "does",
+    "did", "should", "would", "could", "developer", "developers", "engineering",
+    "give", "me", "show", "find", "search", "best", "practices", "ways", "tell"
+}
+
+
+def _extract_search_keywords(topic: str) -> str:
+    """Strips timestamps, conversational phrases and stopwords to extract high-signal search terms."""
+    # Remove timestamps like '00:45 AM', '12:30 PM', '10:00', or trailing digits attached to words
+    clean = re.sub(r'\d+:\d+.*', '', topic)
+    clean = re.sub(r'[^a-zA-Z\s]', ' ', clean).lower()
+    words = clean.split()
+    filtered = [w for w in words if w not in STOPWORDS and len(w) > 1]
+    if filtered:
+        return " ".join(filtered)
+    return topic.strip()
+
+
+def fetch_by_topic(topic: str, limit: int = 30) -> list[NewsItem]:
+    """Fetches high-signal developer articles and discussions matching a specific topic.
+    Handles conversational natural-language queries and strictly excludes all promotional/buyer spam.
+    """
+    items: list[NewsItem] = []
+    clean_topic = topic.strip()
+    search_query = _extract_search_keywords(clean_topic)
+    logger.info("Searching developer stories for topic: '%s' (cleaned query: '%s')...", clean_topic, search_query)
+
+    # 1. Hacker News Algolia Search (Relevance search on real-world engineering discussions)
+    try:
+        import urllib.parse
+        encoded = urllib.parse.quote(search_query)
+        hn_url = f"https://hn.algolia.com/api/v1/search?query={encoded}&tags=story&hitsPerPage=30"
+        with httpx.Client(timeout=DEFAULT_TIMEOUT) as client:
+            resp = client.get(hn_url)
+            if resp.status_code == 200:
+                hits = resp.json().get("hits", [])
+                for h in hits:
+                    title = h.get("title", "")
+                    if not title:
+                        continue
+                    # Block spam/buyer/affiliate junk
+                    if any(sp in title.lower() for sp in EXCLUDE_KEYWORDS):
+                        continue
+                    url = h.get("url") or f"https://news.ycombinator.com/item?id={h.get('objectID')}"
+                    points = h.get("points", 0)
+                    comments = h.get("num_comments", 0)
+                    items.append({
+                        "title": title,
+                        "url": url,
+                        "source": "Hacker News",
+                        "summary": f"Technical discussion on Hacker News ({points} points, {comments} comments) exploring {search_query}.",
+                        "published": h.get("created_at", ""),
+                    })
+    except Exception as e:
+        logger.warning("Algolia HN search failed for '%s': %s", search_query, e)
+
+    # 2. arXiv Search (Applied AI and Security papers)
+    try:
+        encoded_arxiv = search_query.replace(" ", "+")
+        arxiv_url = f"http://export.arxiv.org/api/query?search_query=all:{encoded_arxiv}&sortBy=relevance&max_results=8"
+        arxiv_items = fetch_rss_feed(arxiv_url, f"arXiv ({search_query})", max_items=8)
+        items.extend(arxiv_items)
+    except Exception as e:
+        logger.warning("arXiv search failed for '%s': %s", search_query, e)
+
+    # 3. Premier Engineering Feeds match (Hugging Face, GitHub Engineering, Simon Willison)
+    try:
+        topic_words = set(search_query.lower().split())
+        curated_sources = [
+            ("https://simonwillison.net/atom/everything/", "Simon Willison Weblog"),
+            ("https://huggingface.co/blog/feed.xml", "Hugging Face Blog"),
+            ("https://github.blog/category/engineering/feed/", "GitHub Engineering"),
+            ("https://blog.cloudflare.com/rss/", "Cloudflare Engineering"),
+        ]
+        for feed_url, source_name in curated_sources:
+            feed_items = fetch_rss_feed(feed_url, source_name, max_items=10)
+            for it in feed_items:
+                title_words = set(it["title"].lower().split())
+                if topic_words.intersection(title_words):
+                    items.append(it)
+    except Exception as e:
+        logger.warning("Curated feed match failed: %s", e)
+
+    # 4. If search returned nothing, fallback to general high-signal feeds so user is never stranded
+    if not items:
+        logger.info("Specific search for '%s' returned 0 items; falling back to curated feeds.", search_query)
+        items = fetch_all(topic=None, deduplicate=False)
+
+    return items[:limit]
+
+
+def fetch_all(topic: str | None = None, db_path: str = SEEN_DB_PATH, deduplicate: bool = True) -> list[NewsItem]:
     """Runs developer-centric source fetchers, combines results, and dedupes."""
-    all_items: list[NewsItem] = []
+    if topic:
+        all_items = fetch_by_topic(topic)
+    else:
+        all_items = []
+        # 1. Developer Engineering Blogs (High Quality Learning)
+        all_items.extend(fetch_rss_feed("https://simonwillison.net/atom/everything/", "Simon Willison Weblog"))
+        all_items.extend(fetch_rss_feed("https://huggingface.co/blog/feed.xml", "Hugging Face Blog"))
+        all_items.extend(fetch_rss_feed("https://github.blog/category/engineering/feed/", "GitHub Engineering"))
+        all_items.extend(fetch_rss_feed("https://blog.cloudflare.com/rss/", "Cloudflare Engineering"))
 
-    # 1. Developer Engineering Blogs (High Quality Learning)
-    # Simon Willison (LLMs, Python, SQLite, Engineering experiments)
-    all_items.extend(fetch_rss_feed("https://simonwillison.net/atom/everything/", "Simon Willison Weblog"))
+        # 2. Hacker News (Filtered for Show HN, libraries, technical benchmarks)
+        all_items.extend(fetch_hacker_news())
 
-    # Hugging Face Engineering & Open Models
-    all_items.extend(fetch_rss_feed("https://huggingface.co/blog/feed.xml", "Hugging Face Blog"))
+        # 3. Dev.to (Practical coding and architecture guides)
+        all_items.extend(fetch_dev_to())
 
-    # GitHub Engineering
-    all_items.extend(fetch_rss_feed("https://github.blog/category/engineering/feed/", "GitHub Engineering"))
-
-    # Cloudflare Developer Blog
-    all_items.extend(fetch_rss_feed("https://blog.cloudflare.com/rss/", "Cloudflare Engineering"))
-
-    # 2. Hacker News (Filtered for Show HN, libraries, technical benchmarks)
-    all_items.extend(fetch_hacker_news())
-
-    # 3. Dev.to (Practical coding and architecture guides)
-    all_items.extend(fetch_dev_to())
-
-    # 4. arXiv (Applied ML engineering papers)
-    all_items.extend(fetch_arxiv())
+        # 4. arXiv (Applied ML engineering papers)
+        all_items.extend(fetch_arxiv())
 
     logger.info("Total developer items before deduplication: %d", len(all_items))
 
@@ -251,6 +372,11 @@ def fetch_all(db_path: str = SEEN_DB_PATH, deduplicate: bool = True) -> list[New
             continue
         if not is_seen(url, db_path=db_path):
             unique_items.append(item)
+
+    # If deduplication filtered too heavily during rapid testing, return fresh candidates
+    if len(unique_items) < 5 and all_items:
+        logger.info("Deduplication left only %d items; returning fresh candidates.", len(unique_items))
+        return all_items[:15]
 
     logger.info("Total developer items after deduplication: %d", len(unique_items))
     return unique_items

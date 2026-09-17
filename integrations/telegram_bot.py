@@ -23,6 +23,7 @@ from langgraph.types import Command
 
 from state import PipelineState
 from orchestrator import create_pipeline
+from agents.fetcher import get_random_topic
 
 load_dotenv()
 
@@ -63,13 +64,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
 
     help_text = (
-        f"🤖 **LinkedIn AI News Publisher Bot**\n\n"
+        f"🤖 **Developer LinkedIn Content Bot**\n\n"
         f"{auth_msg}\n\n"
         f"**Available Commands:**\n"
-        f"• `/fetch` or `/run` — Scan latest AI news, rank top 5, and start pipeline\n"
-        f"• `/status` — View current pipeline status and active thread\n"
+        f"• `/topic [name]` — Search fresh stories on a specific topic (e.g. `/topic postgres`, `/topic docker`, `/topic rust`)\n"
+        f"• `/random` — Pick a random fascinating developer topic and get fresh stories\n"
+        f"• `/fetch` or `/run` — Scan latest developer engineering blogs and Hacker News\n"
+        f"• `/status` — View current pipeline status\n"
         f"• `/help` — Show this guide\n\n"
-        f"When a story is selected, you'll preview the branded image card and full post here with one-click approval."
+        f"When a story is selected, I'll generate the post draft and branded visual card for your review."
     )
     await update.effective_message.reply_text(help_text, parse_mode="Markdown")
 
@@ -85,12 +88,13 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     session = ACTIVE_SESSIONS.get(user_id)
     if not session:
-        await update.effective_message.reply_text("No active pipeline run. Send `/fetch` to start one.")
+        await update.effective_message.reply_text("No active pipeline run. Send `/fetch`, `/topic [name]`, or `/random`.")
         return
 
     status = (
         f"📊 **Active Pipeline Session**\n"
         f"• **Thread ID:** `{session.get('thread_id')}`\n"
+        f"• **Topic:** `{session.get('topic', 'General Dev Scan')}`\n"
         f"• **Current Gate:** `{session.get('current_gate', 'in_progress')}`\n"
         f"• **Started At:** `{session.get('started_at')}`"
     )
@@ -102,8 +106,8 @@ def _run_graph_sync(app: Any, input_data: Any, config: dict):
     return app.invoke(input_data, config=config)
 
 
-async def trigger_pipeline_run(chat_id: int, bot: Any) -> None:
-    """Initiates a complete pipeline run for the specified chat."""
+async def trigger_pipeline_run(chat_id: int, bot: Any, topic: str | None = None) -> None:
+    """Initiates a complete pipeline run for the specified chat, optionally filtered by topic."""
     try:
         app = create_pipeline()
     except Exception as e:
@@ -122,24 +126,34 @@ async def trigger_pipeline_run(chat_id: int, bot: Any) -> None:
         "thread_id": thread_id,
         "config": config,
         "app": app,
+        "topic": topic,
         "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         "current_gate": "fetching",
     }
 
-    status_msg = await bot.send_message(
+    if topic:
+        status_text = f"🔍 *Searching real-time developer discussions and articles for:* **{topic}**..."
+    else:
+        status_text = "⏳ *Scanning developer engineering blogs, GitHub & Hacker News...*"
+
+    await bot.send_message(
         chat_id=chat_id,
-        text="⏳ *Scanning Hacker News, Dev.to, TechCrunch & arXiv for top AI breakthroughs...*",
+        text=status_text,
         parse_mode="Markdown",
     )
 
     # 1. Run until first interrupt (await_story_choice)
     loop = asyncio.get_running_loop()
+    graph_input = {
+        "run_date": datetime.now(timezone.utc).isoformat(),
+        "topic": topic,
+    }
     try:
         await loop.run_in_executor(
             None,
             _run_graph_sync,
             app,
-            {"run_date": datetime.now(timezone.utc).isoformat()},
+            graph_input,
             config,
         )
     except Exception as e:
@@ -156,11 +170,25 @@ async def trigger_pipeline_run(chat_id: int, bot: Any) -> None:
 
     interrupt_value = state_snapshot.tasks[0].interrupts[0].value
     options = interrupt_value.get("options", [])
+
+    if not options:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=(
+                f"🔍 *No stories found matching:* \"{topic or 'query'}\".\n\n"
+                f"💡 *Tip:* Try using concise keywords like `/topic AI security`, `/topic agent memory`, or tap `/random`!"
+            ),
+            parse_mode="Markdown",
+        )
+        ACTIVE_SESSIONS.pop(chat_id, None)
+        return
+
     ACTIVE_SESSIONS[chat_id]["ranked_options"] = options
     ACTIVE_SESSIONS[chat_id]["current_gate"] = "story_choice"
 
     # Send ranked story options with inline buttons
-    text_lines = ["📰 **Top 5 AI Stories Selected Today**\n"]
+    header = f"📰 **Top 5 Stories on '{topic}'**\n" if topic else "📰 **Top 5 Developer Stories Selected Today**\n"
+    text_lines = [header]
     buttons = []
     for idx, item in enumerate(options, start=1):
         score = item.get("score", 0.0)
@@ -181,7 +209,7 @@ async def trigger_pipeline_run(chat_id: int, bot: Any) -> None:
 
 
 async def fetch_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Manual trigger command /fetch or /run."""
+    """Manual trigger command /fetch or /run with optional topic."""
     if not update.effective_user or not update.effective_chat:
         return
     user_id = update.effective_user.id
@@ -189,7 +217,54 @@ async def fetch_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.effective_chat.send_message("⛔ Unauthorized.")
         return
 
-    await trigger_pipeline_run(update.effective_chat.id, context.bot)
+    topic = " ".join(context.args).strip() if context.args else None
+    await trigger_pipeline_run(update.effective_chat.id, context.bot, topic=topic)
+
+
+async def topic_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Searches developer news by topic: /topic [keyword] or prompts for a topic."""
+    if not update.effective_user or not update.effective_chat:
+        return
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        await update.effective_chat.send_message("⛔ Unauthorized.")
+        return
+
+    chat_id = update.effective_chat.id
+    if context.args:
+        topic = " ".join(context.args).strip()
+        await trigger_pipeline_run(chat_id, context.bot, topic=topic)
+    else:
+        ACTIVE_SESSIONS[chat_id] = {"waiting_for": "topic_input"}
+        await update.effective_message.reply_text(
+            "🎯 **What topic would you like to explore?**\n\n"
+            "Reply with any developer topic or keyword, for example:\n"
+            "• `PostgreSQL`\n"
+            "• `Docker`\n"
+            "• `Rust`\n"
+            "• `FastAPI`\n"
+            "• `LangGraph`\n"
+            "• `Vector Search`\n"
+            "• `Distributed Systems`",
+            parse_mode="Markdown",
+        )
+
+
+async def random_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Picks a random developer topic and fetches fresh stories."""
+    if not update.effective_user or not update.effective_chat:
+        return
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        await update.effective_chat.send_message("⛔ Unauthorized.")
+        return
+
+    chosen_topic = get_random_topic()
+    await update.effective_message.reply_text(
+        f"🎲 **Random Topic Chosen:** *{chosen_topic}*\nFetching fresh stories...",
+        parse_mode="Markdown",
+    )
+    await trigger_pipeline_run(update.effective_chat.id, context.bot, topic=chosen_topic)
 
 
 async def handle_story_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -340,7 +415,7 @@ async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def handle_user_text_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Listens for free-text replies during the review gate and treats them as edit notes."""
+    """Listens for free-text replies: either a topic response or edit notes during review."""
     if not update.effective_user or not update.effective_message or not update.effective_message.text:
         return
 
@@ -349,10 +424,17 @@ async def handle_user_text_reply(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     chat_id = update.effective_chat.id if update.effective_chat else 0
-    session = ACTIVE_SESSIONS.get(chat_id)
+    session = ACTIVE_SESSIONS.get(chat_id, {})
 
-    # Only treat as edit feedback if currently waiting for review
-    if not session or session.get("current_gate") != "await_review":
+    # Case 1: User is replying to the /topic prompt
+    if session.get("waiting_for") == "topic_input":
+        topic = update.effective_message.text.strip()
+        ACTIVE_SESSIONS.pop(chat_id, None)
+        await trigger_pipeline_run(chat_id, context.bot, topic=topic)
+        return
+
+    # Case 2: User is providing edit feedback during review gate
+    if session.get("current_gate") != "await_review":
         return
 
     edit_notes = update.effective_message.text.strip()
@@ -444,6 +526,8 @@ def build_telegram_app(
 
     # Command handlers
     application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("topic", topic_command))
+    application.add_handler(CommandHandler("random", random_command))
     application.add_handler(CommandHandler("fetch", fetch_command))
     application.add_handler(CommandHandler("run", fetch_command))
     application.add_handler(CommandHandler("status", status_command))
@@ -453,7 +537,7 @@ def build_telegram_app(
     application.add_handler(CallbackQueryHandler(handle_story_selection, pattern=r"^select_story_\d+$"))
     application.add_handler(CallbackQueryHandler(handle_review_action, pattern=r"^review_.*$"))
 
-    # Free text message handler for edit loop
+    # Free text message handler for topic input or edit loop
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_text_reply))
 
     return application

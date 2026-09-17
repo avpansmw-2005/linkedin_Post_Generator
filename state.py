@@ -20,6 +20,7 @@ class RankedItem(NewsItem, total=False):
 
 class PipelineState(TypedDict, total=False):
     run_date: str
+    topic: str | None
     raw_items: list[NewsItem]
     ranked_top5: list[RankedItem]
     chosen_story: RankedItem

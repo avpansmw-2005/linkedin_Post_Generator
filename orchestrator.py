@@ -52,8 +52,22 @@ class PipelineOrchestrator:
         self.publisher_fn = publisher_fn
 
     def fetch_news(self, state: PipelineState) -> dict:
-        logger.info("Fetching AI news stories...")
-        items = self.fetcher_fn()
+        topic = state.get("topic")
+        if topic:
+            logger.info("Fetching developer stories for topic: '%s'...", topic)
+        else:
+            logger.info("Fetching developer stories across engineering feeds...")
+
+        import inspect
+        try:
+            sig = inspect.signature(self.fetcher_fn)
+            if "topic" in sig.parameters:
+                items = self.fetcher_fn(topic=topic)
+            else:
+                items = self.fetcher_fn()
+        except Exception:
+            items = self.fetcher_fn()
+
         return {"raw_items": items}
 
     def rank_news(self, state: PipelineState) -> dict:
