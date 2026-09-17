@@ -442,14 +442,25 @@ async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYP
 
         final_state = app.get_state(config).values
         post_url = final_state.get("linkedin_post_url", "")
-        success_text = (
-            f"🎉 <b>Post Successfully Published!</b>\n\n"
-            f"🔗 <b>LinkedIn URL:</b>\n{post_url}"
-        )
+        from integrations import linkedin
+        if linkedin.is_dry_run():
+            success_text = (
+                f"🧪 <b>[DRY-RUN] Simulation Succeeded!</b>\n\n"
+                f"Your post and visual were processed and simulated safely without touching your live LinkedIn profile.\n\n"
+                f"👉 <i>The link ending in <code>dryrun_...</code> is a simulated mock URL.</i>\n\n"
+                f"🚀 <b>To publish to your REAL LinkedIn account:</b>\n"
+                f"1. Change <code>DRY_RUN=false</code> in <code>.env</code>\n"
+                f"2. Restart <code>main.py</code> in terminal"
+            )
+        else:
+            success_text = (
+                f"🎉 <b>Live Post Successfully Published to LinkedIn!</b>\n\n"
+                f"🔗 <b>LinkedIn URL:</b>\n{post_url}"
+            )
         try:
             await query.message.reply_text(success_text, parse_mode="HTML")
         except Exception:
-            await query.message.reply_text(f"🎉 Post Successfully Published!\n\n🔗 LinkedIn URL:\n{post_url}")
+            await query.message.reply_text(f"🎉 Success!\n\nLinkedIn URL:\n{post_url}")
         ACTIVE_SESSIONS.pop(chat_id, None)
 
     elif action == "review_edit_prompt":
