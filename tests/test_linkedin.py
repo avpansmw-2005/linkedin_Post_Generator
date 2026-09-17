@@ -20,3 +20,11 @@ def test_dry_run_with_image(monkeypatch, tmp_path):
 
     url = linkedin.post("Another exciting development", image_path=str(fake_img))
     assert "dryrun_" in url
+
+
+def test_format_linkedin_text():
+    markdown = "Here are the benefits:\n- **Isolation:** Great feature\n- **Security:** Strict boundaries"
+    formatted = linkedin.format_linkedin_text(markdown)
+    assert "**" not in formatted
+    assert "•" in formatted
+    assert "𝗜𝘀𝗼𝗹𝗮𝘁𝗶𝗼𝗻:" in formatted

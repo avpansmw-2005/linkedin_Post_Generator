@@ -68,18 +68,54 @@ def _upload_to_ayrshare_media(local_path: str, ayrshare_key: str) -> str | None:
     return None
 
 
+def to_unicode_bold(text: str) -> str:
+    """Converts standard ASCII characters to Unicode Mathematical Sans-Serif Bold."""
+    chars = []
+    for c in text:
+        if "A" <= c <= "Z":
+            chars.append(chr(0x1D5D4 + ord(c) - ord("A")))
+        elif "a" <= c <= "z":
+            chars.append(chr(0x1D5EE + ord(c) - ord("a")))
+        elif "0" <= c <= "9":
+            chars.append(chr(0x1D7EC + ord(c) - ord("0")))
+        else:
+            chars.append(c)
+    return "".join(chars)
+
+
+def format_linkedin_text(text: str) -> str:
+    """Formats markdown specifically for LinkedIn feeds:
+    1. Converts **bold** markdown into native Unicode bold characters (e.g. 𝗜𝘀𝗼𝗹𝗮𝘁𝗶𝗼𝗻:).
+    2. Converts bullet lists (- item) into clean bullet symbols (• item).
+    3. Normalizes paragraph spacing so lines don't collapse together on LinkedIn.
+    """
+    import re
+
+    # 1. Convert **bold** markdown to native Unicode bold
+    formatted = re.sub(r"\*\*(.+?)\*\*", lambda m: to_unicode_bold(m.group(1)), text)
+
+    # 2. Convert markdown list dashes into clean bullets
+    formatted = re.sub(r"^[ \t]*[-*][ \t]+", "• ", formatted, flags=re.MULTILINE)
+
+    # 3. Ensure double newlines between paragraphs so LinkedIn doesn't collapse them
+    paragraphs = [p.strip() for p in formatted.split("\n\n") if p.strip()]
+    return "\n\n".join(paragraphs)
+
+
 def post(text: str, image_path: str | None = None) -> str:
     """Publishes a post to LinkedIn.
 
     Signature: post(text: str, image_path: str | None) -> post_url: str
     If DRY_RUN=true, logs the action and returns a mock LinkedIn URL.
     """
+    clean_text = format_linkedin_text(text)
+
     if is_dry_run():
         logger.info("[DRY-RUN] Simulating LinkedIn post publication.")
-        logger.info("[DRY-RUN] Post content preview (first 150 chars):\n%s...", text[:150])
+        logger.info("[DRY-RUN] Post content preview (first 150 chars):\n%s...", clean_text[:150])
         if image_path:
             logger.info("[DRY-RUN] Post attached image: %s", image_path)
-        fake_id = "dryrun_" + str(abs(hash(text)))[:10]
+        fake_id = "dryrun_" + str(abs(hash(clean_text)))[:10]
         return f"https://www.linkedin.com/feed/update/urn:li:activity:{fake_id}"
 
     ayrshare_key = os.getenv("AYRSHARE_API_KEY")
@@ -104,7 +140,7 @@ def post(text: str, image_path: str | None = None) -> str:
             logger.warning("Proceeding with text-only post as image could not be uploaded.")
 
     post_payload: dict = {
-        "post": text,
+        "post": clean_text,
         "platforms": ["linkedin"],
     }
     if media_urls:
