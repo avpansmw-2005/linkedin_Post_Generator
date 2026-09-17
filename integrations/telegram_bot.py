@@ -1,0 +1,459 @@
+"""Interactive Telegram bot providing human-in-the-loop gates for story choice and review."""
+
+from __future__ import annotations
+
+import os
+import asyncio
+import logging
+import traceback
+from datetime import datetime, timezone
+from typing import Any
+from dotenv import load_dotenv
+
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
+from langgraph.types import Command
+
+from state import PipelineState
+from orchestrator import create_pipeline
+
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+# Active threads tracking: chat_id -> active thread info
+ACTIVE_SESSIONS: dict[int, dict[str, Any]] = {}
+
+
+def get_allowed_chat_id() -> int | None:
+    """Retrieves the authorized chat ID from environment."""
+    raw = os.getenv("TELEGRAM_ALLOWED_CHAT_ID", "").strip()
+    if raw and raw.isdigit():
+        return int(raw)
+    return None
+
+
+def is_authorized(user_id: int) -> bool:
+    """Verifies whether the interacting user is authorized."""
+    allowed = get_allowed_chat_id()
+    if allowed is None:
+        return True  # If not set, permits interaction (prints chat ID in /start)
+    return user_id == allowed
+
+
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles /start command, displaying status and user ID."""
+    if not update.effective_user or not update.effective_message:
+        return
+
+    user_id = update.effective_user.id
+    allowed_id = get_allowed_chat_id()
+
+    auth_msg = (
+        "✅ **Authorized user**"
+        if is_authorized(user_id)
+        else f"⚠️ **Unauthorized user** (Your ID: `{user_id}`. Set `TELEGRAM_ALLOWED_CHAT_ID={user_id}` in `.env`)"
+    )
+
+    help_text = (
+        f"🤖 **LinkedIn AI News Publisher Bot**\n\n"
+        f"{auth_msg}\n\n"
+        f"**Available Commands:**\n"
+        f"• `/fetch` or `/run` — Scan latest AI news, rank top 5, and start pipeline\n"
+        f"• `/status` — View current pipeline status and active thread\n"
+        f"• `/help` — Show this guide\n\n"
+        f"When a story is selected, you'll preview the branded image card and full post here with one-click approval."
+    )
+    await update.effective_message.reply_text(help_text, parse_mode="Markdown")
+
+
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Displays active session information."""
+    if not update.effective_user or not update.effective_message:
+        return
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        await update.effective_message.reply_text("⛔ Unauthorized access.")
+        return
+
+    session = ACTIVE_SESSIONS.get(user_id)
+    if not session:
+        await update.effective_message.reply_text("No active pipeline run. Send `/fetch` to start one.")
+        return
+
+    status = (
+        f"📊 **Active Pipeline Session**\n"
+        f"• **Thread ID:** `{session.get('thread_id')}`\n"
+        f"• **Current Gate:** `{session.get('current_gate', 'in_progress')}`\n"
+        f"• **Started At:** `{session.get('started_at')}`"
+    )
+    await update.effective_message.reply_text(status, parse_mode="Markdown")
+
+
+def _run_graph_sync(app: Any, input_data: Any, config: dict):
+    """Executes app.invoke synchronously inside a background thread pool."""
+    return app.invoke(input_data, config=config)
+
+
+async def trigger_pipeline_run(chat_id: int, bot: Any) -> None:
+    """Initiates a complete pipeline run for the specified chat."""
+    try:
+        app = create_pipeline()
+    except Exception as e:
+        logger.error("Pipeline graph creation failed: %s", e, exc_info=True)
+        await bot.send_message(
+            chat_id=chat_id,
+            text=f"❌ **Failed to initialize pipeline:**\n`{e}`",
+            parse_mode="Markdown",
+        )
+        return
+
+    thread_id = f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+    config = {"configurable": {"thread_id": thread_id}}
+
+    ACTIVE_SESSIONS[chat_id] = {
+        "thread_id": thread_id,
+        "config": config,
+        "app": app,
+        "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "current_gate": "fetching",
+    }
+
+    status_msg = await bot.send_message(
+        chat_id=chat_id,
+        text="⏳ *Scanning Hacker News, Dev.to, TechCrunch & arXiv for top AI breakthroughs...*",
+        parse_mode="Markdown",
+    )
+
+    # 1. Run until first interrupt (await_story_choice)
+    loop = asyncio.get_running_loop()
+    try:
+        await loop.run_in_executor(
+            None,
+            _run_graph_sync,
+            app,
+            {"run_date": datetime.now(timezone.utc).isoformat()},
+            config,
+        )
+    except Exception as e:
+        logger.error("Pipeline initiation failed: %s", e, exc_info=True)
+        await bot.send_message(chat_id=chat_id, text=f"❌ Pipeline failed during fetch/rank: `{e}`")
+        ACTIVE_SESSIONS.pop(chat_id, None)
+        return
+
+    # Check interrupt payload
+    state_snapshot = app.get_state(config)
+    if not state_snapshot.tasks or not state_snapshot.tasks[0].interrupts:
+        await bot.send_message(chat_id=chat_id, text="⚠️ Graph did not pause at expected story choice interrupt.")
+        return
+
+    interrupt_value = state_snapshot.tasks[0].interrupts[0].value
+    options = interrupt_value.get("options", [])
+    ACTIVE_SESSIONS[chat_id]["ranked_options"] = options
+    ACTIVE_SESSIONS[chat_id]["current_gate"] = "story_choice"
+
+    # Send ranked story options with inline buttons
+    text_lines = ["📰 **Top 5 AI Stories Selected Today**\n"]
+    buttons = []
+    for idx, item in enumerate(options, start=1):
+        score = item.get("score", 0.0)
+        source = item.get("source", "News")
+        title = item.get("title", "Untitled")
+        reason = item.get("reason", "")
+        text_lines.append(f"*{idx}. {title}*\n⭐ Score: `{score}` | 📡 {source}\n💡 _{reason}_\n")
+        btn_label = f"Select #{idx}: {title[:35]}..."
+        buttons.append([InlineKeyboardButton(btn_label, callback_data=f"select_story_{idx-1}")])
+
+    text_lines.append("👇 **Tap a story below to generate the post and visual card:**")
+    await bot.send_message(
+        chat_id=chat_id,
+        text="\n".join(text_lines),
+        reply_markup=InlineKeyboardMarkup(buttons),
+        parse_mode="Markdown",
+    )
+
+
+async def fetch_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Manual trigger command /fetch or /run."""
+    if not update.effective_user or not update.effective_chat:
+        return
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        await update.effective_chat.send_message("⛔ Unauthorized.")
+        return
+
+    await trigger_pipeline_run(update.effective_chat.id, context.bot)
+
+
+async def handle_story_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Callback query handler when user taps a story button."""
+    query = update.callback_query
+    if not query or not query.data:
+        return
+    await query.answer()
+
+    user_id = update.effective_user.id if update.effective_user else 0
+    if not is_authorized(user_id):
+        await query.edit_message_text("⛔ Unauthorized.")
+        return
+
+    chat_id = update.effective_chat.id if update.effective_chat else 0
+    session = ACTIVE_SESSIONS.get(chat_id)
+    if not session or session.get("current_gate") != "story_choice":
+        await query.edit_message_text("⚠️ No active story selection pending.")
+        return
+
+    idx = int(query.data.replace("select_story_", ""))
+    options = session.get("ranked_options", [])
+    if idx >= len(options):
+        await query.edit_message_text("❌ Selected option out of range.")
+        return
+
+    chosen_story = options[idx]
+    await query.edit_message_text(f"✅ Selected: *{chosen_story.get('title')}*\n\nDrafting post and rendering card image...", parse_mode="Markdown")
+
+    app = session["app"]
+    config = session["config"]
+    loop = asyncio.get_running_loop()
+
+    # 2. Resume graph with chosen story -> runs generate_draft -> humanize -> await_review
+    try:
+        await loop.run_in_executor(
+            None,
+            _run_graph_sync,
+            app,
+            Command(resume=chosen_story),
+            config,
+        )
+    except Exception as e:
+        logger.error("Resume failed during drafting: %s", e, exc_info=True)
+        await context.bot.send_message(chat_id=chat_id, text=f"❌ Failed drafting post: `{e}`")
+        return
+
+    state_snapshot = app.get_state(config)
+    if not state_snapshot.tasks or not state_snapshot.tasks[0].interrupts:
+        await context.bot.send_message(chat_id=chat_id, text="⚠️ Graph did not pause at review gate.")
+        return
+
+    session["current_gate"] = "await_review"
+    current_state = state_snapshot.values
+
+    # Send review prompt with image card
+    await _send_review_message(chat_id, context.bot, current_state)
+
+
+async def _send_review_message(chat_id: int, bot: Any, state: dict) -> None:
+    """Sends the drafted post text, attached card image, and review action buttons."""
+    image_path = state.get("draft_image_path")
+    post_text = state.get("humanized_post") or state.get("draft_post", "")
+
+    # Send card image if exists
+    if image_path and os.path.exists(image_path):
+        with open(image_path, "rb") as photo:
+            await bot.send_photo(
+                chat_id=chat_id,
+                photo=photo,
+                caption="🎨 **Rendered LinkedIn Social Card**",
+                parse_mode="Markdown",
+            )
+
+    keyboard = [
+        [InlineKeyboardButton("🚀 Approve & Publish", callback_data="review_approve")],
+        [InlineKeyboardButton("✍️ Edit Feedback / Polish", callback_data="review_edit_prompt")],
+    ]
+
+    review_msg = (
+        f"📝 **LinkedIn Post Preview:**\n\n"
+        f"---\n"
+        f"{post_text}\n"
+        f"---\n\n"
+        f"👉 **Options:**\n"
+        f"• Tap **Approve & Publish** to post live to LinkedIn.\n"
+        f"• Or simply **type a message reply** here with any edit instructions (e.g. _\"Make the hook more technical\"_) to regenerate!"
+    )
+    await bot.send_message(
+        chat_id=chat_id,
+        text=review_msg,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles review button callbacks (Approve)."""
+    query = update.callback_query
+    if not query or not query.data:
+        return
+    await query.answer()
+
+    chat_id = update.effective_chat.id if update.effective_chat else 0
+    session = ACTIVE_SESSIONS.get(chat_id)
+    if not session or session.get("current_gate") != "await_review":
+        await query.message.reply_text("⚠️ No review currently awaiting action.")
+        return
+
+    action = query.data
+    app = session["app"]
+    config = session["config"]
+    loop = asyncio.get_running_loop()
+
+    if action == "review_approve":
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text("⏳ Approving and publishing to LinkedIn...")
+
+        try:
+            await loop.run_in_executor(
+                None,
+                _run_graph_sync,
+                app,
+                Command(resume={"action": "approve"}),
+                config,
+            )
+        except Exception as e:
+            logger.error("Publishing failed: %s", e, exc_info=True)
+            await query.message.reply_text(f"❌ Failed to publish post: `{e}`")
+            return
+
+        final_state = app.get_state(config).values
+        post_url = final_state.get("linkedin_post_url", "")
+        success_text = (
+            f"🎉 **Post Successfully Published!**\n\n"
+            f"🔗 **LinkedIn URL:** {post_url}"
+        )
+        await query.message.reply_text(success_text, parse_mode="Markdown")
+        ACTIVE_SESSIONS.pop(chat_id, None)
+
+    elif action == "review_edit_prompt":
+        await query.message.reply_text(
+            "💬 **Type your edit instructions directly in a chat message.**\n"
+            "For example:\n"
+            "• _'Highlight the performance benchmark numbers more.'_\n"
+            "• _'Make the opening hook 1 sentence.'_\n"
+            "• _'Add a question about developer adoption.'_"
+        )
+
+
+async def handle_user_text_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Listens for free-text replies during the review gate and treats them as edit notes."""
+    if not update.effective_user or not update.effective_message or not update.effective_message.text:
+        return
+
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        return
+
+    chat_id = update.effective_chat.id if update.effective_chat else 0
+    session = ACTIVE_SESSIONS.get(chat_id)
+
+    # Only treat as edit feedback if currently waiting for review
+    if not session or session.get("current_gate") != "await_review":
+        return
+
+    edit_notes = update.effective_message.text.strip()
+    await update.effective_message.reply_text(
+        f"✍️ *Applying your feedback:* \"_{edit_notes}_\"...\nRegenerating post with humanizer...",
+        parse_mode="Markdown",
+    )
+
+    app = session["app"]
+    config = session["config"]
+    loop = asyncio.get_running_loop()
+
+    # Resume graph with edit request -> loops back to humanize -> hits await_review
+    try:
+        await loop.run_in_executor(
+            None,
+            _run_graph_sync,
+            app,
+            Command(resume={"action": "edit", "notes": edit_notes}),
+            config,
+        )
+    except Exception as e:
+        logger.error("Failed to re-humanize with edits: %s", e, exc_info=True)
+        await update.effective_message.reply_text(f"❌ Error applying edits: `{e}`")
+        return
+
+    state_snapshot = app.get_state(config)
+    session["current_gate"] = "await_review"
+    current_state = state_snapshot.values
+
+    # Resend updated review preview
+    await _send_review_message(chat_id, context.bot, current_state)
+
+
+async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Catches all unhandled exceptions and notifies the user in Telegram."""
+    logger.error("Exception while handling Telegram update:", exc_info=context.error)
+
+    err_msg = str(context.error) if context.error else "Unknown error occurred"
+    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__) if context.error else []
+    tb_text = "".join(tb_list)
+    tb_snippet = tb_text[-600:] if len(tb_text) > 600 else tb_text
+
+    notify_text = (
+        f"⚠️ **Error in Pipeline / Bot:**\n\n"
+        f"**Reason:** `{err_msg}`\n\n"
+        f"**Traceback:**\n```\n{tb_snippet}\n```"
+    )
+
+    chat = None
+    if isinstance(update, Update) and update.effective_chat:
+        chat = update.effective_chat
+
+    if chat:
+        try:
+            await chat.send_message(notify_text, parse_mode="Markdown")
+        except Exception:
+            await chat.send_message(f"⚠️ Error: {err_msg}\n\n{tb_snippet}")
+    elif get_allowed_chat_id() and context.bot:
+        try:
+            await context.bot.send_message(
+                chat_id=get_allowed_chat_id(),
+                text=notify_text,
+                parse_mode="Markdown",
+            )
+        except Exception:
+            pass
+
+
+def build_telegram_app(
+    post_init: Any = None,
+    post_shutdown: Any = None,
+) -> Application:
+    """Builds and configures the python-telegram-bot application."""
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not token:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN environment variable is not configured.")
+
+    builder = Application.builder().token(token)
+    if post_init:
+        builder.post_init(post_init)
+    if post_shutdown:
+        builder.post_shutdown(post_shutdown)
+
+    application = builder.build()
+
+    # Register error handler
+    application.add_error_handler(global_error_handler)
+
+    # Command handlers
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("fetch", fetch_command))
+    application.add_handler(CommandHandler("run", fetch_command))
+    application.add_handler(CommandHandler("status", status_command))
+    application.add_handler(CommandHandler("help", start_command))
+
+    # Inline query callbacks
+    application.add_handler(CallbackQueryHandler(handle_story_selection, pattern=r"^select_story_\d+$"))
+    application.add_handler(CallbackQueryHandler(handle_review_action, pattern=r"^review_.*$"))
+
+    # Free text message handler for edit loop
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_text_reply))
+
+    return application

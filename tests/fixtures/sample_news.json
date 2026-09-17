@@ -1,0 +1,72 @@
+[
+  {
+    "title": "DeepSeek Releases Open-Source MoE Architecture with Multi-Head Latent Attention",
+    "url": "https://news.ycombinator.com/item?id=40010001",
+    "source": "Hacker News",
+    "summary": "DeepSeek has introduced a new open-source Mixture-of-Experts (MoE) model featuring Multi-Head Latent Attention (MLA), significantly reducing inference memory footprint while matching dense model reasoning benchmarks.",
+    "published": "2026-09-15T14:30:00Z"
+  },
+  {
+    "title": "Anthropic Announces Claude 3.7 Sonnet with Hybrid Reasoning Modes",
+    "url": "https://techcrunch.com/2026/09/14/anthropic-claude-hybrid-reasoning",
+    "source": "TechCrunch AI",
+    "summary": "Anthropic reveals Claude 3.7 Sonnet offering dual-mode reasoning: near-instant standard generation alongside an adjustable deliberate thinking mode for complex code generation and mathematical analysis.",
+    "published": "2026-09-14T10:00:00Z"
+  },
+  {
+    "title": "Speculative Decoding Reaches 3x Speedup on Consumer GPUs via Draft Verification",
+    "url": "https://arxiv.org/abs/2609.12345",
+    "source": "arXiv cs.AI",
+    "summary": "A new speculative decoding paper demonstrates a 3x generation speedup on single consumer GPUs by utilizing tiny specialized draft models with zero perplexity degradation on 70B target models.",
+    "published": "2026-09-16T08:00:00Z"
+  },
+  {
+    "title": "Building Production Agentic Workflows with LangGraph: A Deep Dive",
+    "url": "https://dev.to/engineering/building-production-agents-langgraph",
+    "source": "Dev.to",
+    "summary": "A comprehensive guide on managing state persistence, human-in-the-loop interrupts, and durable event checkpoints for mission-critical enterprise LLM agents.",
+    "published": "2026-09-15T18:00:00Z"
+  },
+  {
+    "title": "OpenAI Introduces Web Search Native Integration in Operator API",
+    "url": "https://theverge.com/2026/09/13/openai-operator-search-api",
+    "source": "The Verge AI",
+    "summary": "Developers can now trigger live autonomous web browsing, search verification, and structured data extraction through OpenAI's unified Operator API.",
+    "published": "2026-09-13T12:00:00Z"
+  },
+  {
+    "title": "vLLM 0.7 Introduces Chunked Prefill and FlashAttention-3 Support",
+    "url": "https://news.ycombinator.com/item?id=40010006",
+    "source": "Hacker News",
+    "summary": "The high-throughput LLM serving engine vLLM adds native chunked prefill, distributed multi-node pipeline parallelism, and optimized FP8 kernels for Hopper architectures.",
+    "published": "2026-09-15T11:00:00Z"
+  },
+  {
+    "title": "Why Context Caching is Revolutionizing LLM Application Costs",
+    "url": "https://dev.to/ai_builder/why-context-caching-cuts-costs",
+    "source": "Dev.to",
+    "summary": "Prompt caching has slashed LLM token bills by 80% for large codebase queries and long-running interactive agents. Here is an analysis of cache eviction policies.",
+    "published": "2026-09-14T16:20:00Z"
+  },
+  {
+    "title": "Self-Rewarding Language Models with Hierarchical Preference Optimization",
+    "url": "https://arxiv.org/abs/2609.05432",
+    "source": "arXiv cs.CL",
+    "summary": "Researchers propose a novel reinforcement learning framework where models synthesize their own evaluation rubrics, outperforming human preference annotation datasets.",
+    "published": "2026-09-16T05:15:00Z"
+  },
+  {
+    "title": "Meta Open-Sources Llama 4 Infrastructure Stacks and Synthetic Data Pipelines",
+    "url": "https://techcrunch.com/2026/09/15/meta-llama-4-infra-pipelines",
+    "source": "TechCrunch AI",
+    "summary": "Meta releases open tooling used to generate multi-modal synthetic alignment data and test high-concurrency training clusters for next-generation foundation models.",
+    "published": "2026-09-15T09:30:00Z"
+  },
+  {
+    "title": "SQLite as a Vector Database: Benchmarks and Surprising Findings",
+    "url": "https://news.ycombinator.com/item?id=40010010",
+    "source": "Hacker News",
+    "summary": "Benchmarking sqlite-vec against dedicated vector databases for datasets up to 1 million vectors. Demonstrates that for local and embedded systems, SQLite is remarkably competitive.",
+    "published": "2026-09-14T13:45:00Z"
+  }
+]

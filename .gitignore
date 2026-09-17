@@ -1,0 +1,29 @@
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+
+# Environment credentials
+.env
+
+# SQLite databases
+data/*.db
+!data/.gitkeep
+
+# Generated images & scratch media
+data/images/
+*.png
+*.jpg
+*.jpeg
+
+# IDE & OS
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
