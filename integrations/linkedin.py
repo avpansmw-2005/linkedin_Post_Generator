@@ -102,8 +102,9 @@ def format_linkedin_text(text: str) -> str:
     return "\n\n".join(paragraphs)
 
 
-LINKEDIN_API_VERSION = "202401"
+LINKEDIN_API_VERSION = os.getenv("LINKEDIN_API_VERSION", "202608")
 LINKEDIN_REST_BASE = "https://api.linkedin.com/rest"
+CANDIDATE_VERSIONS = ["202608", "202607", "202606", "202605", "202604", "202603", "202602", "202601"]
 
 
 def _get_linkedin_person_urn(access_token: str) -> str:
@@ -147,19 +148,12 @@ def _get_linkedin_person_urn(access_token: str) -> str:
 
 
 def _upload_linkedin_image_rest(image_path: str, access_token: str, person_urn: str) -> str:
-    """Uploads an image using the official LinkedIn REST API (202401):
+    """Uploads an image using the official LinkedIn REST API:
     1. POST /rest/images?action=initializeUpload
     2. PUT <uploadUrl> with binary PNG/JPEG content
     Returns: The image URN (e.g., 'urn:li:image:D4E10AQH...').
     """
     import httpx
-
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json",
-        "X-Restli-Protocol-Version": "2.0.0",
-        "LinkedIn-Version": LINKEDIN_API_VERSION,
-    }
 
     init_payload = {
         "initializeUploadRequest": {
@@ -167,37 +161,48 @@ def _upload_linkedin_image_rest(image_path: str, access_token: str, person_urn: 
         }
     }
 
+    versions_to_try = [LINKEDIN_API_VERSION] + [v for v in CANDIDATE_VERSIONS if v != LINKEDIN_API_VERSION]
+    last_err: Exception | None = None
+
     with httpx.Client(timeout=30.0) as client:
-        logger.info("Initializing image upload via LinkedIn REST API...")
-        resp = client.post(
-            f"{LINKEDIN_REST_BASE}/images?action=initializeUpload",
-            headers=headers,
-            json=init_payload,
-        )
-        if resp.status_code not in (200, 201):
-            raise RuntimeError(f"LinkedIn image initializeUpload failed ({resp.status_code}): {resp.text}")
+        for ver in versions_to_try:
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+                "X-Restli-Protocol-Version": "2.0.0",
+                "LinkedIn-Version": ver,
+            }
+            logger.info("Initializing image upload via LinkedIn REST API (version %s)...", ver)
+            resp = client.post(
+                f"{LINKEDIN_REST_BASE}/images?action=initializeUpload",
+                headers=headers,
+                json=init_payload,
+            )
+            if resp.status_code in (200, 201):
+                data = resp.json().get("value", {})
+                image_urn = data.get("image")
+                upload_url = data.get("uploadUrl")
+                if image_urn and upload_url:
+                    # Step 2: Binary PUT
+                    with open(image_path, "rb") as f:
+                        image_bytes = f.read()
 
-        data = resp.json().get("value", {})
-        image_urn = data.get("image")
-        upload_url = data.get("uploadUrl")
-        if not (image_urn and upload_url):
-            raise RuntimeError(f"Missing image URN or upload URL in LinkedIn response: {resp.text}")
+                    put_headers = {
+                        "Authorization": f"Bearer {access_token}",
+                        "Content-Type": "image/png",
+                    }
+                    logger.info("Uploading binary image bytes to LinkedIn upload URL...")
+                    put_resp = client.put(upload_url, headers=put_headers, content=image_bytes)
+                    if put_resp.status_code in (200, 201, 204):
+                        logger.info("Successfully uploaded image to LinkedIn: %s (using version %s)", image_urn, ver)
+                        return image_urn
+                    else:
+                        raise RuntimeError(f"LinkedIn binary image upload failed ({put_resp.status_code}): {put_resp.text}")
 
-        # Step 2: Binary PUT
-        with open(image_path, "rb") as f:
-            image_bytes = f.read()
+            logger.warning("LinkedIn image initializeUpload failed with version %s (status %d): %s", ver, resp.status_code, resp.text)
+            last_err = RuntimeError(f"LinkedIn image initializeUpload failed ({resp.status_code}): {resp.text}")
 
-        put_headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "image/png",
-        }
-        logger.info("Uploading binary image bytes to LinkedIn upload URL...")
-        put_resp = client.put(upload_url, headers=put_headers, content=image_bytes)
-        if put_resp.status_code not in (200, 201, 204):
-            raise RuntimeError(f"LinkedIn binary image upload failed ({put_resp.status_code}): {put_resp.text}")
-
-        logger.info("Successfully uploaded image to LinkedIn: %s", image_urn)
-        return image_urn
+    raise last_err or RuntimeError("Failed to initialize LinkedIn image upload on all versions.")
 
 
 def _post_official_rest(text: str, image_path: str | None = None) -> str:
@@ -241,17 +246,29 @@ def _post_official_rest(text: str, image_path: str | None = None) -> str:
             }
         }
 
-    logger.info("Submitting post to official LinkedIn /rest/posts endpoint...")
-    with httpx.Client(timeout=20.0) as client:
-        resp = client.post(f"{LINKEDIN_REST_BASE}/posts", headers=headers, json=payload)
-        if resp.status_code not in (200, 201):
-            raise RuntimeError(f"LinkedIn /rest/posts failed ({resp.status_code}): {resp.text}")
+    versions_to_try = [LINKEDIN_API_VERSION] + [v for v in CANDIDATE_VERSIONS if v != LINKEDIN_API_VERSION]
+    last_err: Exception | None = None
 
-        post_urn = resp.headers.get("x-restli-id") or ""
-        logger.info("Successfully created LinkedIn post via official REST API: %s", post_urn)
-        if post_urn:
-            return f"https://www.linkedin.com/feed/update/{post_urn}"
-        return "https://www.linkedin.com/in/me/recent-activity/all/"
+    with httpx.Client(timeout=20.0) as client:
+        for ver in versions_to_try:
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+                "X-Restli-Protocol-Version": "2.0.0",
+                "LinkedIn-Version": ver,
+            }
+            logger.info("Submitting post to official LinkedIn /rest/posts endpoint (version %s)...", ver)
+            resp = client.post(f"{LINKEDIN_REST_BASE}/posts", headers=headers, json=payload)
+            if resp.status_code in (200, 201):
+                post_urn = resp.headers.get("x-restli-id") or ""
+                logger.info("Successfully created LinkedIn post via official REST API: %s", post_urn)
+                if post_urn:
+                    return f"https://www.linkedin.com/feed/update/{post_urn}"
+                return "https://www.linkedin.com/in/me/recent-activity/all/"
+            logger.warning("LinkedIn /rest/posts failed with version %s (status %d): %s", ver, resp.status_code, resp.text)
+            last_err = RuntimeError(f"LinkedIn /rest/posts failed ({resp.status_code}): {resp.text}")
+
+    raise last_err or RuntimeError("Failed to create LinkedIn post on all API versions.")
 
 
 def post(text: str, image_path: str | None = None) -> str:
