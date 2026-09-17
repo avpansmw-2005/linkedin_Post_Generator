@@ -30,6 +30,7 @@ class PipelineState(TypedDict, total=False):
     image_mode: Literal["card", "ai_visual"]
     draft_image_path: str
     humanized_post: str
+    ai_detection_score: int
     review_status: Literal["pending", "approved", "edit_requested"]
     user_edit_notes: str | None
     final_post: str

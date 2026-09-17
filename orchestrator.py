@@ -113,9 +113,13 @@ class PipelineOrchestrator:
         chosen = state.get("chosen_story")
 
         rewritten = self.humanizer_fn(base_text, edit_notes, chosen)
+        from agents import detector
+        score_info = detector.analyze_ai_probability(rewritten)
+
         return {
             "humanized_post": rewritten,
             "user_edit_notes": None,
+            "ai_detection_score": score_info["ai_score"],
         }
 
     def await_review(self, state: PipelineState) -> dict:
@@ -128,6 +132,7 @@ class PipelineOrchestrator:
             "image_mode": state.get("image_mode", "card"),
             "draft_metadata": state.get("draft_metadata", {}),
             "chosen_story": state.get("chosen_story", {}),
+            "ai_detection_score": state.get("ai_detection_score", 0),
         })
 
         if not isinstance(feedback, dict):

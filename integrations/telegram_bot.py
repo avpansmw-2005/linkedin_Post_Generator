@@ -329,7 +329,7 @@ async def handle_story_selection(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def _send_review_message(chat_id: int, bot: Any, state: dict) -> None:
-    """Sends the drafted post text, attached card image, and review action buttons."""
+    """Sends the drafted post text, attached card image, AI detection metrics, and review action buttons."""
     image_path = state.get("draft_image_path")
     image_mode = state.get("image_mode") or "card"
     post_text = state.get("humanized_post") or state.get("draft_post", "")
@@ -349,10 +349,25 @@ async def _send_review_message(chat_id: int, bot: Any, state: dict) -> None:
                 parse_mode="Markdown",
             )
 
+    from agents import detector
+    ai_info = detector.analyze_ai_probability(post_text)
+    ai_pct = ai_info["ai_score"]
+    human_pct = ai_info["human_score"]
+    status = ai_info["status"]
+    badge = ai_info["badge"]
+
+    flagged_note = ""
+    if ai_info.get("flagged_phrases"):
+        phrases = ", ".join(f'"{p}"' for p in ai_info["flagged_phrases"][:3])
+        flagged_note = f"\n⚠️ _Flagged AI tropes:_ {phrases}"
+
     keyboard = [
         [
             InlineKeyboardButton("📊 Architecture Card", callback_data="switch_img_card"),
             InlineKeyboardButton("🎨 AI Visual (GPT-Image)", callback_data="switch_img_ai"),
+        ],
+        [
+            InlineKeyboardButton("🧬 Make More Human", callback_data="rehumanize_aggressive"),
         ],
         [InlineKeyboardButton("🚀 Approve & Publish", callback_data="review_approve")],
         [InlineKeyboardButton("✍️ Edit Feedback / Polish", callback_data="review_edit_prompt")],
@@ -360,10 +375,13 @@ async def _send_review_message(chat_id: int, bot: Any, state: dict) -> None:
 
     review_msg = (
         f"📝 **LinkedIn Post Preview:**\n\n"
+        f"🛡️ **AI Detection:** `{ai_pct}% AI` · `{human_pct}% Human` ({status} {badge})"
+        f"{flagged_note}\n\n"
         f"---\n"
         f"{post_text}\n"
         f"---\n\n"
         f"👉 **Options:**\n"
+        f"• Tap **🧬 Make More Human** to aggressively rewrite and lower AI detection.\n"
         f"• Tap **Architecture Card** or **AI Visual** to toggle image style.\n"
         f"• Tap **Approve & Publish** to post live to LinkedIn.\n"
         f"• Or simply **type a message reply** here with any edit instructions (e.g. _\"Highlight the microVM boot latency\"_) to regenerate!"
@@ -472,6 +490,41 @@ async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYP
         except Exception:
             await query.message.reply_text(f"🎉 Success!\n\nLinkedIn URL:\n{post_url}")
         ACTIVE_SESSIONS.pop(chat_id, None)
+
+    elif action == "rehumanize_aggressive":
+        await query.message.reply_text(
+            "🧬 *Applying aggressive anti-AI humanizer...*\n"
+            "_Restructuring sentence burstiness, stripping tropes, and injecting authentic dev voice..._",
+            parse_mode="Markdown",
+        )
+        current_state = app.get_state(config).values
+        post_text = current_state.get("humanized_post") or current_state.get("draft_post", "")
+        chosen = current_state.get("chosen_story")
+
+        from agents import humanizer, detector
+        try:
+            rewritten = await loop.run_in_executor(
+                None,
+                humanizer.rewrite,
+                post_text,
+                None,
+                chosen,
+                True,  # aggressive=True
+            )
+            score_info = detector.analyze_ai_probability(rewritten)
+            app.update_state(
+                config,
+                {
+                    "humanized_post": rewritten,
+                    "draft_post": rewritten,
+                    "ai_detection_score": score_info["ai_score"],
+                },
+            )
+            updated_state = app.get_state(config).values
+            await _send_review_message(chat_id, context.bot, updated_state)
+        except Exception as e:
+            logger.error("Aggressive humanization failed: %s", e, exc_info=True)
+            await query.message.reply_text(f"❌ Failed to humanize post: `{e}`")
 
     elif action == "review_edit_prompt":
         await query.message.reply_text(
@@ -604,7 +657,7 @@ def build_telegram_app(
 
     # Inline query callbacks
     application.add_handler(CallbackQueryHandler(handle_story_selection, pattern=r"^select_story_\d+$"))
-    application.add_handler(CallbackQueryHandler(handle_review_action, pattern=r"^(review_.*|switch_img_.*)$"))
+    application.add_handler(CallbackQueryHandler(handle_review_action, pattern=r"^(review_.*|switch_img_.*|rehumanize_.*)$"))
 
     # Free text message handler for topic input or edit loop
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_text_reply))

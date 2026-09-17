@@ -50,8 +50,11 @@ def rewrite(
     base_text: str,
     edit_notes: str | None = None,
     story: dict | None = None,
+    aggressive: bool = False,
 ) -> str:
-    """Refines the voice of the draft post and applies user edit notes if present."""
+    """Refines the voice of the draft post and applies user edit notes if present.
+    If aggressive=True, aggressively rewrites to maximize burstiness and drive AI score to 0%.
+    """
     if not base_text:
         return ""
 
@@ -60,19 +63,29 @@ def rewrite(
         user_instructions.append(f"Context Story Title: {story.get('title', '')}")
     if edit_notes:
         user_instructions.append(f"User Edit Feedback to Incorporate:\n\"{edit_notes}\"")
+    elif aggressive:
+        user_instructions.append(
+            "🔥 ULTRA-AGGRESSIVE ANTI-AI REWRITE DIRECTIVE:\n"
+            "- Defeat GPTZero and ZeroGPT AI detectors completely (target: < 10% AI score).\n"
+            "- Radically break rhythmic uniformity. Inject extreme burstiness: alternate punchy 2-4 word sentences ('Don't do it.', 'Total silence.', 'Zero exceptions.') right next to 25-word technical explanations.\n"
+            "- Eliminate ALL high-school textbook definitions and generic transitions like 'The benefits are straightforward' or 'Of course, there are trade-offs'.\n"
+            "- Frame everything with gritty developer realism and firsthand architectural conviction.\n"
+            "- Keep all technical facts, source links, and hashtags intact."
+        )
     else:
         user_instructions.append("Instruction: Polish this post into an authentic, human engineering voice. Strip all AI fluff.")
 
     user_prompt = "\n\n".join(user_instructions)
+    temp = 0.75 if aggressive else 0.5
 
     try:
         result = llm_client.complete(
             system=HUMANIZER_SYSTEM_PROMPT,
             user=user_prompt,
             schema=HumanizedPost,
-            temperature=0.5,
+            temperature=temp,
         )
-        logger.info("Post refined: %s", result.summary_of_changes)
+        logger.info("Post refined (aggressive=%s): %s", aggressive, result.summary_of_changes)
         return result.refined_text
 
     except Exception as e:
