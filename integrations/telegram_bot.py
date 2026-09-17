@@ -327,19 +327,29 @@ async def handle_story_selection(update: Update, context: ContextTypes.DEFAULT_T
 async def _send_review_message(chat_id: int, bot: Any, state: dict) -> None:
     """Sends the drafted post text, attached card image, and review action buttons."""
     image_path = state.get("draft_image_path")
+    image_mode = state.get("image_mode") or "card"
     post_text = state.get("humanized_post") or state.get("draft_post", "")
 
     # Send card image if exists
     if image_path and os.path.exists(image_path):
+        caption = (
+            "📊 **Technical Architecture Infographic Card**\n_3 Structured Technical Pillars + Engineering Takeaway_"
+            if image_mode == "card"
+            else "🎨 **16:9 AI Visual Concept**\n_Generated with OpenAI gpt-image-2.5-flare_"
+        )
         with open(image_path, "rb") as photo:
             await bot.send_photo(
                 chat_id=chat_id,
                 photo=photo,
-                caption="🎨 **Rendered LinkedIn Social Card**",
+                caption=caption,
                 parse_mode="Markdown",
             )
 
     keyboard = [
+        [
+            InlineKeyboardButton("📊 Architecture Card", callback_data="switch_img_card"),
+            InlineKeyboardButton("🎨 AI Visual (GPT-Image)", callback_data="switch_img_ai"),
+        ],
         [InlineKeyboardButton("🚀 Approve & Publish", callback_data="review_approve")],
         [InlineKeyboardButton("✍️ Edit Feedback / Polish", callback_data="review_edit_prompt")],
     ]
@@ -350,8 +360,9 @@ async def _send_review_message(chat_id: int, bot: Any, state: dict) -> None:
         f"{post_text}\n"
         f"---\n\n"
         f"👉 **Options:**\n"
+        f"• Tap **Architecture Card** or **AI Visual** to toggle image style.\n"
         f"• Tap **Approve & Publish** to post live to LinkedIn.\n"
-        f"• Or simply **type a message reply** here with any edit instructions (e.g. _\"Make the hook more technical\"_) to regenerate!"
+        f"• Or simply **type a message reply** here with any edit instructions (e.g. _\"Highlight the microVM boot latency\"_) to regenerate!"
     )
     await bot.send_message(
         chat_id=chat_id,
@@ -361,7 +372,7 @@ async def _send_review_message(chat_id: int, bot: Any, state: dict) -> None:
 
 
 async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles review button callbacks (Approve)."""
+    """Handles review button callbacks (Approve, Edit, Switch Image Style)."""
     query = update.callback_query
     if not query or not query.data:
         return
@@ -378,7 +389,41 @@ async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYP
     config = session["config"]
     loop = asyncio.get_running_loop()
 
-    if action == "review_approve":
+    if action in ("switch_img_card", "switch_img_ai"):
+        target_mode = "card" if action == "switch_img_card" else "ai_visual"
+        current_state = app.get_state(config).values
+        if current_state.get("image_mode") == target_mode and os.path.exists(current_state.get("draft_image_path", "")):
+            await query.message.reply_text(f"ℹ️ The **{target_mode.upper()}** style is already active.", parse_mode="Markdown")
+            return
+
+        status_msg = (
+            "⏳ *Rendering Technical Architecture Card...*"
+            if target_mode == "card"
+            else "⏳ *Generating 16:9 AI Visual using OpenAI gpt-image-2.5-flare (this takes ~4-6s)...*"
+        )
+        await query.message.reply_text(status_msg, parse_mode="Markdown")
+
+        chosen = current_state.get("chosen_story", {})
+        draft_meta = current_state.get("draft_metadata", {})
+
+        from agents import imagegen
+        try:
+            new_img_path = await loop.run_in_executor(
+                None,
+                imagegen.render,
+                chosen,
+                draft_meta,
+                target_mode,
+            )
+            # Update checkpointer state with new image path and mode
+            app.update_state(config, {"draft_image_path": new_img_path, "image_mode": target_mode})
+            updated_state = app.get_state(config).values
+            await _send_review_message(chat_id, context.bot, updated_state)
+        except Exception as e:
+            logger.error("Failed switching image style: %s", e, exc_info=True)
+            await query.message.reply_text(f"❌ Failed to generate {target_mode} image: `{e}`")
+
+    elif action == "review_approve":
         await query.edit_message_reply_markup(reply_markup=None)
         await query.message.reply_text("⏳ Approving and publishing to LinkedIn...")
 
@@ -535,7 +580,7 @@ def build_telegram_app(
 
     # Inline query callbacks
     application.add_handler(CallbackQueryHandler(handle_story_selection, pattern=r"^select_story_\d+$"))
-    application.add_handler(CallbackQueryHandler(handle_review_action, pattern=r"^review_.*$"))
+    application.add_handler(CallbackQueryHandler(handle_review_action, pattern=r"^(review_.*|switch_img_.*)$"))
 
     # Free text message handler for topic input or edit loop
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_text_reply))

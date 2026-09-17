@@ -92,10 +92,17 @@ class PipelineOrchestrator:
             raise ValueError("No story chosen before generate_draft!")
 
         draft = self.writer_fn(chosen)
-        image_path = self.imagegen_fn(chosen, draft)
+        image_mode = state.get("image_mode") or "card"
+        try:
+            image_path = self.imagegen_fn(chosen, draft, mode=image_mode)
+        except TypeError:
+            image_path = self.imagegen_fn(chosen, draft)
+
         return {
             "draft_post": draft.get("text", ""),
             "draft_hashtags": draft.get("tags", []),
+            "draft_metadata": draft,
+            "image_mode": image_mode,
             "draft_image_path": image_path,
         }
 
@@ -118,6 +125,9 @@ class PipelineOrchestrator:
             "text": state.get("humanized_post", ""),
             "image": state.get("draft_image_path", ""),
             "hashtags": state.get("draft_hashtags", []),
+            "image_mode": state.get("image_mode", "card"),
+            "draft_metadata": state.get("draft_metadata", {}),
+            "chosen_story": state.get("chosen_story", {}),
         })
 
         if not isinstance(feedback, dict):
@@ -125,10 +135,11 @@ class PipelineOrchestrator:
 
         action = feedback.get("action")
         if action == "approve":
+            final_img = feedback.get("image_path") or state.get("draft_image_path", "")
             return {
                 "review_status": "approved",
                 "final_post": state.get("humanized_post", ""),
-                "final_image_path": state.get("draft_image_path", ""),
+                "final_image_path": final_img,
             }
         elif action in ("edit", "edit_requested"):
             return {

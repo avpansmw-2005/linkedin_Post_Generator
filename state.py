@@ -26,6 +26,8 @@ class PipelineState(TypedDict, total=False):
     chosen_story: RankedItem
     draft_post: str
     draft_hashtags: list[str]
+    draft_metadata: dict
+    image_mode: Literal["card", "ai_visual"]
     draft_image_path: str
     humanized_post: str
     review_status: Literal["pending", "approved", "edit_requested"]

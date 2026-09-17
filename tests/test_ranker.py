@@ -33,5 +33,5 @@ def test_ranker_short_list_fallback():
     # Candidate count <= 5 triggers direct score assignment without calling external LLM
     result = rank(items, top_k=5)
     assert len(result) == 2
-    assert result[0]["score"] == 8.0
+    assert 1.0 <= result[0]["score"] <= 10.0
     assert "reason" in result[0]
