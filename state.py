@@ -26,6 +26,7 @@ class PipelineState(TypedDict, total=False):
     mode: str | None  # "all" | "learning" | "mistakes" | "news"
     raw_items: list[NewsItem]
     ranked_top5: list[RankedItem]
+    ranked_options: list[RankedItem]
     chosen_story: RankedItem
     draft_post: str
     draft_hashtags: list[str]

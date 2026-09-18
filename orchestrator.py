@@ -80,17 +80,19 @@ class PipelineOrchestrator:
         import inspect
         try:
             sig = inspect.signature(self.ranker_fn)
+            kwargs = {}
             if "mode" in sig.parameters:
-                top5 = self.ranker_fn(raw_items, mode=mode)
-            else:
-                top5 = self.ranker_fn(raw_items)
+                kwargs["mode"] = mode
+            if "top_k" in sig.parameters:
+                kwargs["top_k"] = 10
+            ranked = self.ranker_fn(raw_items, **kwargs)
         except Exception:
-            top5 = self.ranker_fn(raw_items)
-        return {"ranked_top5": top5}
+            ranked = self.ranker_fn(raw_items)
+        return {"ranked_top5": ranked, "ranked_options": ranked}
 
     def await_story_choice(self, state: PipelineState) -> dict:
         logger.info("Pausing for user story selection (interrupt 1)...")
-        options = state.get("ranked_top5", [])
+        options = state.get("ranked_options") or state.get("ranked_top5", [])
         choice = interrupt({
             "kind": "story_choice",
             "options": options,

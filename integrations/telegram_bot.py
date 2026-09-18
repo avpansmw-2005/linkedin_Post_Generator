@@ -218,16 +218,19 @@ async def trigger_pipeline_run(
         "latest_news": "🚀 [Latest News]",
     }
 
+    opt_count = len(options)
+    count_str = f"Top {opt_count}" if opt_count else "Top Stories"
+
     if mode == "learning":
-        header = "🎓 **Top 5 AI Developer Learning Topics**\n"
+        header = f"🎓 **{count_str} AI Developer Learning Topics**\n"
     elif mode == "mistakes":
-        header = "⚠️ **Top 5 Developer Mistakes & Postmortems**\n"
+        header = f"⚠️ **{count_str} Developer Mistakes & Postmortems**\n"
     elif mode == "news":
-        header = "🚀 **Top 5 Latest AI & Tech News**\n"
+        header = f"🚀 **{count_str} Latest AI & Tech News**\n"
     elif topic:
-        header = f"📰 **Top 5 Stories on '{topic}'**\n"
+        header = f"📰 **{count_str} Stories on '{topic}'**\n"
     else:
-        header = "📰 **Top 5 High-Signal Developer Stories**\n"
+        header = f"📰 **{count_str} High-Signal Developer Stories**\n"
 
     text_lines = [header]
     buttons = []
@@ -567,25 +570,25 @@ async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYP
 
     elif action == "rehumanize_aggressive":
         await query.message.reply_text(
-            "🧬 *Applying aggressive anti-AI humanizer...*\n"
-            "_Restructuring sentence burstiness, stripping tropes, and injecting authentic dev voice..._",
+            "🧬 *Starting Anti-AI Self-Correction Loop...*\n"
+            "_Iteratively analyzing sentence burstiness, stripping tropes, and verifying detector score..._",
             parse_mode="Markdown",
         )
         current_state = app.get_state(config).values
         post_text = current_state.get("humanized_post") or current_state.get("draft_post", "")
         chosen = current_state.get("chosen_story")
 
-        from agents import humanizer, detector
+        from agents import humanizer
         try:
-            rewritten = await loop.run_in_executor(
+            rewritten, score_info, iterations = await loop.run_in_executor(
                 None,
-                humanizer.rewrite,
+                humanizer.rewrite_with_feedback_loop,
                 post_text,
-                None,
                 chosen,
-                True,  # aggressive=True
+                None,
+                3,   # max_iterations
+                20,  # target_ai_score
             )
-            score_info = detector.analyze_ai_probability(rewritten)
             app.update_state(
                 config,
                 {
@@ -595,6 +598,14 @@ async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYP
                 },
             )
             updated_state = app.get_state(config).values
+
+            pass_label = "1 feedback pass" if iterations == 1 else f"{iterations} feedback passes"
+            await query.message.reply_text(
+                f"✅ *Self-Correction Completed in {pass_label}!*\n"
+                f"🛡️ **Score:** `{score_info['ai_score']}% AI` · `{score_info['human_score']}% Human` ({score_info['status']} {score_info['badge']})\n"
+                f"⚡ **Sentence Burstiness:** `{score_info['burstiness']}`",
+                parse_mode="Markdown",
+            )
             await _send_review_message(chat_id, context.bot, updated_state)
         except Exception as e:
             logger.error("Aggressive humanization failed: %s", e, exc_info=True)

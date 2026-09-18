@@ -52,3 +52,38 @@ def test_ranker_category_priority_scores():
     assert result[1]["category"] == "developer_mistake"
     assert result[2]["category"] == "latest_news"
 
+
+def test_top_ten_ranking_schema_and_variety():
+    from agents.ranker import TopTenRanking
+    raw_payload = {
+        "top_items": [
+            {
+                "index": i,
+                "title": f"Story {i}",
+                "url": f"https://example.com/{i}",
+                "source": "HN",
+                "summary": f"Summary {i}",
+                "category": "ai_learning" if i <= 4 else ("developer_mistake" if i <= 7 else "latest_news"),
+                "score": 9.5 - i * 0.1,
+                "reason": f"Takeaway {i}",
+            }
+            for i in range(1, 11)
+        ]
+    }
+    parsed = TopTenRanking.model_validate(raw_payload)
+    assert len(parsed.top_items) == 10
+    categories = {it.category for it in parsed.top_items}
+    assert "ai_learning" in categories
+    assert "developer_mistake" in categories
+    assert "latest_news" in categories
+
+
+def test_ranker_returns_ten_items_fallback():
+    items = [
+        {"title": f"Story {i}", "url": f"https://example.com/{i}", "category": "ai_learning" if i % 2 == 0 else "developer_mistake"}
+        for i in range(1, 15)
+    ]
+    result = rank(items, top_k=10)
+    assert len(result) == 10
+    assert result[0]["score"] >= result[-1]["score"]
+

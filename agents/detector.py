@@ -50,13 +50,17 @@ AI_HALLMARK_PHRASES = [
 
 
 def split_sentences(text: str) -> list[str]:
-    """Splits text into cleaned sentences, stripping URLs and hashtags."""
+    """Splits text into cleaned sentences, stripping URLs and hashtags.
+    Correctly recognizes bullet points, line breaks, and punctuation terminators.
+    """
     # Strip URLs
     clean = re.sub(r'https?://\S+', '', text)
     # Strip Hashtags
     clean = re.sub(r'#\w+', '', clean)
-    # Split by period, exclamation, or question mark followed by whitespace
-    raw_sentences = re.split(r'[.!?]+\s+', clean)
+    # Strip leading markdown bullet markers
+    clean = re.sub(r'(?m)^[ \t]*[-*•]\s*', '', clean)
+    # Split by period, exclamation, question mark, or newlines
+    raw_sentences = re.split(r'(?:[.!?]+(?:\s+|\n+|$)|[\r\n]+)', clean)
     sentences = [s.strip() for s in raw_sentences if len(s.strip().split()) >= 2]
     return sentences
 
@@ -107,21 +111,21 @@ def analyze_ai_probability(text: str) -> dict:
     flagged_phrases = scan_ai_hallmarks(text)
 
     # Base baseline probability
-    # If burstiness is very low (uniform 12-16 word sentences), AI score increases
+    # If burstiness is very low (uniform sentences), AI score increases
     base_score = 15.0
 
-    if burstiness < 3.0:
+    if burstiness < 2.5:
         base_score += 40.0  # Extreme uniformity is a massive AI flag
-    elif burstiness < 4.5:
-        base_score += 25.0
-    elif burstiness < 6.0:
-        base_score += 10.0
-    elif burstiness >= 8.0:
+    elif burstiness < 3.8:
+        base_score += 20.0  # Low variation
+    elif burstiness < 5.0:
+        base_score += 0.0   # Moderate natural variation
+    elif burstiness >= 7.0:
         base_score -= 15.0  # High variation heavily signals human writing
-    elif burstiness >= 6.5:
-        base_score -= 5.0
+    elif burstiness >= 5.0:
+        base_score -= 5.0   # Good human cadence
 
-    # Penalize heavily for each detected hallmark phrase (20% per trope)
+    # Penalize heavily for each detected hallmark phrase (22% per trope)
     hallmark_penalty = len(flagged_phrases) * 22.0
     total_score = base_score + hallmark_penalty
 

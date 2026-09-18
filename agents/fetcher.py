@@ -492,7 +492,7 @@ def _extract_search_keywords(topic: str) -> str:
     return topic.strip()
 
 
-def fetch_by_topic(topic: str, mode: str | None = None, limit: int = 30) -> list[NewsItem]:
+def fetch_by_topic(topic: str, mode: str | None = None, limit: int = 40) -> list[NewsItem]:
     """Fetches high-signal developer articles and discussions matching a specific topic.
     Guarantees recent results via search_by_date and prioritizes AI Learning and Dev Mistakes.
     """
@@ -685,9 +685,9 @@ def fetch_all(
             unique_items.append(item)
 
     # Fallback to fresh candidates if deduplication was too aggressive
-    if len(unique_items) < 5 and all_items:
+    if len(unique_items) < 10 and all_items:
         logger.info("Deduplication left only %d items; returning fresh candidates.", len(unique_items))
-        return all_items[:20]
+        return all_items[:40]
 
     logger.info("Total developer items after deduplication: %d", len(unique_items))
     return unique_items
