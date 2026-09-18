@@ -17,8 +17,14 @@ class ScoredNewsItem(BaseModel):
     url: str = Field(description="Source URL")
     source: str = Field(description="Publisher/Source")
     summary: str = Field(description="Brief summary")
-    score: float = Field(description="Score between 1.0 and 10.0 based on developer learning value and technical substance")
-    reason: str = Field(description="Punchy one-sentence developer takeaway: what a developer learns or can apply from this")
+    category: str = Field(
+        default="ai_learning",
+        description="Category: 'ai_learning' (Priority 1), 'developer_mistake' (Priority 2), or 'latest_news' (Priority 3)",
+    )
+    score: float = Field(
+        description="Score between 1.0 and 10.0 following the preference hierarchy (AI learning: 9.0-10.0, Mistakes: 8.0-8.9, News: 7.0-7.9)"
+    )
+    reason: str = Field(description="Punchy 1-sentence takeaway: what a developer learns or the pitfall to avoid")
 
 
 class TopFiveRanking(BaseModel):
@@ -28,33 +34,84 @@ class TopFiveRanking(BaseModel):
 
 
 RANKER_SYSTEM_PROMPT = """You are a Principal AI Systems Architect and technical thought leader.
-Your goal is to evaluate technical articles and select the highest-signal stories that an ambitious software engineer can share on LinkedIn to:
-1. Demonstrate deep, hands-on mastery of modern AI development (agent security, MCP protocols, sandboxing, inference optimization, RAG architectures, and production reliability).
-2. Position the author as an elite technical practitioner that high-growth tech companies, CTOs, and recruiters actively seek out and respect.
-3. Highlight actionable architecture insights, code execution boundaries, and system design patterns.
+Your goal is to evaluate candidate technical articles and pick the top 5 highest-signal stories to share on LinkedIn.
 
-Strictly Reject & Penalize:
-- Non-technical articles, buyer's guides, spam, promotional listicles, corporate PR, pricing/account services, and shallow fluff.
+CONTENT PREFERENCE HIERARCHY (STRICT PRIORITY ORDER):
+1. 🎓 FIRST & HIGHEST PREFERENCE: New Topics Related to AI That a Developer Can Learn (Target Score: 9.0 - 10.0)
+   - Hands-on AI system design, autonomous agent workflows, Model Context Protocol (MCP), tool sandboxing.
+   - Retrieval-Augmented Generation (RAG) architecture, semantic embeddings, chunking, reranking.
+   - Local model inference (vLLM, Ollama, llama.cpp), quantization (GGUF, AWQ, FP8), fine-tuning (LoRA).
+   - Structured outputs, prompt engineering, speculative decoding, context caching, evals.
+   - Actionable tutorials, architecture benchmarks, and practical engineering skills.
 
-Return the top stories sorted by score descending. For each story, provide a sharp, technically rigorous 1-sentence developer takeaway explaining the architectural insight."""
+2. ⚠️ SECOND PREFERENCE: Mistakes That Most Developers Do, Pitfalls & Postmortems (Target Score: 8.0 - 8.9)
+   - Real-world mistakes developers make, anti-patterns, and what NOT to do in production.
+   - AI traps: prompt injection vulnerabilities, naive RAG retrieval traps, runaway agent loops, token explosions.
+   - Systems traps: connection pool exhaustion, leaky abstractions, indexing errors, concurrency deadlocks.
+   - Production postmortems, outage analyses, debugging lessons, and hard-earned engineering takeaways.
+
+3. 🚀 THIRD PREFERENCE: Latest AI News & Model Breakthroughs (Target Score: 7.0 - 7.9)
+   - Major new model and open-source releases (DeepSeek, Claude, Mistral, OpenAI, Meta Llama).
+   - Major framework versions and breakthrough research papers.
+
+MANDATORY CRITERIA:
+- Freshness & Recency: Stories MUST be latest and current. Stories published within the last 24-48 hours get top preference.
+- High Substance: Must contain concrete technical takeaways, not marketing fluff or PR.
+- Category Tagging: Assign each item its exact category: 'ai_learning', 'developer_mistake', or 'latest_news'.
+
+STRICTLY REJECT & PENALIZE (Score: 0.0 - 3.0):
+- Stale/old stories, buyer's guides, non-technical listicles, corporate drama, funding rounds, spam, or basic fluff.
+
+Return the top 5 stories sorted by score descending. For each story, provide a sharp, technically rigorous 1-sentence developer takeaway explaining what a developer learns or the pitfall to avoid."""
 
 
-def rank(items: list[NewsItem], top_k: int = 5) -> list[RankedItem]:
+def rank(items: list[NewsItem], top_k: int = 5, mode: str | None = None) -> list[RankedItem]:
     """Evaluates raw news items using the LLM client and returns the top ranked items."""
     if not items:
         logger.warning("No news items provided to ranker.")
         return []
 
+    # If already a small set, directly assign scores without an external LLM roundtrip
+    if len(items) <= top_k:
+        ranked_fallback: list[RankedItem] = []
+        for it in items:
+            cat = it.get("category", "ai_learning")
+            if mode == "mistakes":
+                base_score = 9.5 if cat == "developer_mistake" else (8.5 if cat == "ai_learning" else 7.5)
+            elif mode == "news":
+                base_score = 9.5 if cat == "latest_news" else (8.5 if cat == "ai_learning" else 7.5)
+            else:
+                base_score = 9.5 if cat == "ai_learning" else (8.8 if cat == "developer_mistake" else 7.8)
+            ranked_fallback.append({
+                **it,
+                "score": base_score,
+                "category": cat,
+                "reason": f"High-signal {cat.replace('_', ' ')} story from {it.get('source', 'stream')}.",
+            })
+        return ranked_fallback
+
     # Format items for prompt
     candidates_text = []
-    for idx, it in enumerate(items[:30], start=1):
+    for idx, it in enumerate(items[:35], start=1):
+        cat = it.get("category", "ai_learning")
+        rel = it.get("relative_time", "recent")
         candidates_text.append(
-            f"[{idx}] Title: {it.get('title', '')}\n"
+            f"[{idx}] Category: {cat} | Published: {rel}\n"
+            f"Title: {it.get('title', '')}\n"
             f"Source: {it.get('source', '')}\n"
             f"URL: {it.get('url', '')}\n"
             f"Summary: {it.get('summary', '')}\n"
         )
-    user_prompt = "Here are the candidate AI stories from the latest scan:\n\n" + "\n".join(candidates_text)
+
+    mode_instruction = ""
+    if mode == "mistakes":
+        mode_instruction = "\nSPECIAL DIRECTIVE: The user explicitly requested DEVELOPER MISTAKES, PITFALLS, AND POSTMORTEMS. Prioritize and rank developer mistake/postmortem stories at the very top (scores 9.0-10.0)!\n\n"
+    elif mode == "learning":
+        mode_instruction = "\nSPECIAL DIRECTIVE: The user explicitly requested AI DEVELOPER LEARNING TOPICS. Prioritize and rank actionable AI learning and architecture stories at the very top (scores 9.0-10.0)!\n\n"
+    elif mode == "news":
+        mode_instruction = "\nSPECIAL DIRECTIVE: The user explicitly requested LATEST AI NEWS AND MODEL RELEASES. Prioritize and rank fresh model and framework releases at the top!\n\n"
+
+    user_prompt = f"Here are the candidate stories from the latest scan:{mode_instruction}\n" + "\n".join(candidates_text)
 
     try:
         ranking_result = llm_client.complete(
@@ -66,12 +123,15 @@ def rank(items: list[NewsItem], top_k: int = 5) -> list[RankedItem]:
 
         ranked: list[RankedItem] = []
         for scored in ranking_result.top_items[:top_k]:
+            orig = next((it for it in items if it.get("url") == scored.url), {})
             ranked.append({
                 "title": scored.title,
                 "url": scored.url,
                 "source": scored.source,
                 "summary": scored.summary,
-                "published": "",
+                "published": orig.get("published", ""),
+                "category": scored.category or orig.get("category", "ai_learning"),
+                "relative_time": orig.get("relative_time", ""),
                 "score": scored.score,
                 "reason": scored.reason,
             })
@@ -80,11 +140,14 @@ def rank(items: list[NewsItem], top_k: int = 5) -> list[RankedItem]:
     except Exception as e:
         logger.error("LLM ranking failed, falling back to top candidates: %s", e)
         # Fallback to first top_k
-        return [
-            {
+        ranked_fallback = []
+        for item in items[:top_k]:
+            cat = item.get("category", "ai_learning")
+            base_score = 9.5 if cat == "ai_learning" else (8.8 if cat == "developer_mistake" else 7.8)
+            ranked_fallback.append({
                 **item,
-                "score": 7.0,
-                "reason": f"Selected from {item.get('source', 'news stream')}.",
-            }
-            for item in items[:top_k]
-        ]
+                "score": base_score,
+                "category": cat,
+                "reason": f"High-signal {cat.replace('_', ' ')} story from {item.get('source', 'news stream')}.",
+            })
+        return ranked_fallback

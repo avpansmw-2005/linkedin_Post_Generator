@@ -35,3 +35,20 @@ def test_ranker_short_list_fallback():
     assert len(result) == 2
     assert 1.0 <= result[0]["score"] <= 10.0
     assert "reason" in result[0]
+
+
+def test_ranker_category_priority_scores():
+    items = [
+        {"title": "MCP Architecture", "url": "https://example.com/1", "category": "ai_learning"},
+        {"title": "Prisma Bug Postmortem", "url": "https://example.com/2", "category": "developer_mistake"},
+        {"title": "New Model Release", "url": "https://example.com/3", "category": "latest_news"},
+    ]
+    result = rank(items, top_k=5)
+    assert len(result) == 3
+    # AI Learning (9.5) > Developer Mistake (8.8) > Latest News (7.8)
+    assert result[0]["score"] > result[1]["score"]
+    assert result[1]["score"] > result[2]["score"]
+    assert result[0]["category"] == "ai_learning"
+    assert result[1]["category"] == "developer_mistake"
+    assert result[2]["category"] == "latest_news"
+

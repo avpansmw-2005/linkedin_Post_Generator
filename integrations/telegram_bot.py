@@ -70,10 +70,17 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     help_text = (
         f"🤖 **Developer LinkedIn Content Bot**\n\n"
         f"🔒 **Security Status:** Authenticated (User ID: `{user_id}`)\n\n"
+        f"**Content Priorities:**\n"
+        f"1. 🎓 **AI Developer Learning** (MCP, RAG, local LLMs, agent architecture)\n"
+        f"2. ⚠️ **Developer Mistakes & Pitfalls** (Common anti-patterns, traps, & postmortems)\n"
+        f"3. 🚀 **Latest AI News & Releases** (New models & framework breakthroughs)\n\n"
         f"**Available Commands:**\n"
-        f"• `/topic [name]` — Search fresh stories on a specific topic (e.g. `/topic postgres`, `/topic docker`, `/topic rust`)\n"
-        f"• `/random` — Pick a random fascinating developer topic and get fresh stories\n"
-        f"• `/fetch` or `/run` — Scan latest developer engineering blogs and Hacker News\n"
+        f"• `/learn` — Scan top fresh AI topics a developer can learn\n"
+        f"• `/mistakes` — Scan common developer mistakes, traps & postmortems\n"
+        f"• `/news` — Scan latest model and framework releases\n"
+        f"• `/fetch` or `/run` — Prioritized scan (AI Learning > Mistakes > News)\n"
+        f"• `/topic [name]` — Search fresh stories on a topic (e.g. `/topic mcp`, `/topic postgres`, `/topic rag`)\n"
+        f"• `/random` — Pick a random topic focused on AI learning or pitfall avoidance\n"
         f"• `/status` — View current pipeline status\n"
         f"• `/help` — Show this guide\n\n"
         f"When a story is selected, I'll generate the post draft and branded visual card for your review."
@@ -92,13 +99,14 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     session = ACTIVE_SESSIONS.get(user_id)
     if not session:
-        await update.effective_message.reply_text("No active pipeline run. Send `/fetch`, `/topic [name]`, or `/random`.")
+        await update.effective_message.reply_text("No active pipeline run. Send `/fetch`, `/learn`, `/mistakes`, or `/topic [name]`.")
         return
 
     status = (
         f"📊 **Active Pipeline Session**\n"
         f"• **Thread ID:** `{session.get('thread_id')}`\n"
         f"• **Topic:** `{session.get('topic', 'General Dev Scan')}`\n"
+        f"• **Mode:** `{session.get('mode', 'prioritized_all')}`\n"
         f"• **Current Gate:** `{session.get('current_gate', 'in_progress')}`\n"
         f"• **Started At:** `{session.get('started_at')}`"
     )
@@ -110,8 +118,13 @@ def _run_graph_sync(app: Any, input_data: Any, config: dict):
     return app.invoke(input_data, config=config)
 
 
-async def trigger_pipeline_run(chat_id: int, bot: Any, topic: str | None = None) -> None:
-    """Initiates a complete pipeline run for the specified chat, optionally filtered by topic."""
+async def trigger_pipeline_run(
+    chat_id: int,
+    bot: Any,
+    topic: str | None = None,
+    mode: str | None = None,
+) -> None:
+    """Initiates a complete pipeline run for the specified chat, optionally filtered by topic or mode."""
     try:
         app = create_pipeline()
     except Exception as e:
@@ -131,14 +144,21 @@ async def trigger_pipeline_run(chat_id: int, bot: Any, topic: str | None = None)
         "config": config,
         "app": app,
         "topic": topic,
+        "mode": mode,
         "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         "current_gate": "fetching",
     }
 
-    if topic:
+    if mode == "learning":
+        status_text = "🎓 *Scanning fresh AI Developer Learning topics (architectures, MCP, local LLMs, RAG)...*"
+    elif mode == "mistakes":
+        status_text = "⚠️ *Scanning fresh Developer Mistakes, Pitfalls & Postmortems...*"
+    elif mode == "news":
+        status_text = "🚀 *Scanning latest AI releases and model breakthroughs...*"
+    elif topic:
         status_text = f"🔍 *Searching real-time developer discussions and articles for:* **{topic}**..."
     else:
-        status_text = "⏳ *Scanning developer engineering blogs, GitHub & Hacker News...*"
+        status_text = "⏳ *Scanning fresh developer stories (Prioritizing AI Learning & Dev Mistakes)...*"
 
     await bot.send_message(
         chat_id=chat_id,
@@ -151,6 +171,7 @@ async def trigger_pipeline_run(chat_id: int, bot: Any, topic: str | None = None)
     graph_input = {
         "run_date": datetime.now(timezone.utc).isoformat(),
         "topic": topic,
+        "mode": mode,
     }
     try:
         await loop.run_in_executor(
@@ -191,7 +212,23 @@ async def trigger_pipeline_run(chat_id: int, bot: Any, topic: str | None = None)
     ACTIVE_SESSIONS[chat_id]["current_gate"] = "story_choice"
 
     # Send ranked story options with inline buttons
-    header = f"📰 **Top 5 Stories on '{topic}'**\n" if topic else "📰 **Top 5 Developer Stories Selected Today**\n"
+    CAT_BADGES = {
+        "ai_learning": "🎓 [AI Learning]",
+        "developer_mistake": "⚠️ [Dev Mistake]",
+        "latest_news": "🚀 [Latest News]",
+    }
+
+    if mode == "learning":
+        header = "🎓 **Top 5 AI Developer Learning Topics**\n"
+    elif mode == "mistakes":
+        header = "⚠️ **Top 5 Developer Mistakes & Postmortems**\n"
+    elif mode == "news":
+        header = "🚀 **Top 5 Latest AI & Tech News**\n"
+    elif topic:
+        header = f"📰 **Top 5 Stories on '{topic}'**\n"
+    else:
+        header = "📰 **Top 5 High-Signal Developer Stories**\n"
+
     text_lines = [header]
     buttons = []
     for idx, item in enumerate(options, start=1):
@@ -199,7 +236,11 @@ async def trigger_pipeline_run(chat_id: int, bot: Any, topic: str | None = None)
         source = item.get("source", "News")
         title = item.get("title", "Untitled")
         reason = item.get("reason", "")
-        text_lines.append(f"*{idx}. {title}*\n⭐ Score: `{score}` | 📡 {source}\n💡 _{reason}_\n")
+        cat = item.get("category", "ai_learning")
+        badge = CAT_BADGES.get(cat, "💡")
+        rel = item.get("relative_time", "")
+        rel_str = f" • 🕒 {rel}" if rel else ""
+        text_lines.append(f"*{idx}. {badge} {title}*\n⭐ Score: `{score}` | 📡 {source}{rel_str}\n💡 _{reason}_\n")
         btn_label = f"Select #{idx}: {title[:35]}..."
         buttons.append([InlineKeyboardButton(btn_label, callback_data=f"select_story_{idx-1}")])
 
@@ -210,6 +251,39 @@ async def trigger_pipeline_run(chat_id: int, bot: Any, topic: str | None = None)
         reply_markup=InlineKeyboardMarkup(buttons),
         parse_mode="Markdown",
     )
+
+
+async def learn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Manual trigger command /learn to scan AI learning topics."""
+    if not update.effective_user or not update.effective_chat:
+        return
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        await update.effective_chat.send_message("⛔ Unauthorized.")
+        return
+    await trigger_pipeline_run(update.effective_chat.id, context.bot, mode="learning")
+
+
+async def mistakes_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Manual trigger command /mistakes to scan developer pitfalls and postmortems."""
+    if not update.effective_user or not update.effective_chat:
+        return
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        await update.effective_chat.send_message("⛔ Unauthorized.")
+        return
+    await trigger_pipeline_run(update.effective_chat.id, context.bot, mode="mistakes")
+
+
+async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Manual trigger command /news to scan latest AI releases."""
+    if not update.effective_user or not update.effective_chat:
+        return
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        await update.effective_chat.send_message("⛔ Unauthorized.")
+        return
+    await trigger_pipeline_run(update.effective_chat.id, context.bot, mode="news")
 
 
 async def fetch_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -648,6 +722,9 @@ def build_telegram_app(
 
     # Command handlers
     application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("learn", learn_command))
+    application.add_handler(CommandHandler("mistakes", mistakes_command))
+    application.add_handler(CommandHandler("news", news_command))
     application.add_handler(CommandHandler("topic", topic_command))
     application.add_handler(CommandHandler("random", random_command))
     application.add_handler(CommandHandler("fetch", fetch_command))

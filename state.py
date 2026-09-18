@@ -11,6 +11,8 @@ class NewsItem(TypedDict, total=False):
     source: str
     summary: str
     published: str
+    category: str  # "ai_learning" | "developer_mistake" | "latest_news"
+    relative_time: str
 
 
 class RankedItem(NewsItem, total=False):
@@ -21,6 +23,7 @@ class RankedItem(NewsItem, total=False):
 class PipelineState(TypedDict, total=False):
     run_date: str
     topic: str | None
+    mode: str | None  # "all" | "learning" | "mistakes" | "news"
     raw_items: list[NewsItem]
     ranked_top5: list[RankedItem]
     chosen_story: RankedItem

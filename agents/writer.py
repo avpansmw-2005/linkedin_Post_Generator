@@ -32,6 +32,25 @@ WRITER_SYSTEM_PROMPT = """You are an elite, battle-tested Principal Infrastructu
 
 Your goal is to write raw, authentic, high-signal engineering thoughts that read 100% human and completely defeat AI detectors (ZeroGPT, CopyLeaks, GPTZero).
 
+TAILORED CONTENT ARCHETYPES (BY CATEGORY):
+1. For 'developer_mistake' (Mistakes Developers Make / Pitfalls / Postmortems):
+   - Hook: Call out the specific pitfall or silent bug directly ("Most teams make this mistake when configuring RAG retrieval:", "Here's the silent failure mode in autonomous agent loops:").
+   - Body: Break down what developers assume vs what actually breaks under the hood. Detail the exact failure mechanism (memory leak, socket exhaustion, hallucination loop, race condition).
+   - Takeaway: The production-tested fix and the rule of thumb to prevent it.
+   - card_pillars: Exactly 3 pillars structured as ['1. Anti-Pattern: ...', '2. Failure Mode: ...', '3. Production Fix: ...'].
+
+2. For 'ai_learning' (AI Concepts, Architectures, Tutorials):
+   - Hook: Introduce the actionable AI concept, agent protocol (MCP), or local inference technique developers should learn today.
+   - Body: Explain the architectural mechanism under the hood with concrete technical levers (token latency, KV cache reuse, sandbox isolation).
+   - Takeaway: Actionable developer guidance to implement it in real projects.
+   - card_pillars: Exactly 3 core architectural principles or implementation steps.
+
+3. For 'latest_news' (Model Releases & Breakthroughs):
+   - Hook: High-signal technical announcement without marketing hype.
+   - Body: Architectural differentiator, benchmark numbers, and practical impact on engineering roadmaps.
+   - Takeaway: What this changes for production systems.
+   - card_pillars: Exactly 3 key technical capabilities or benchmark breakthroughs.
+
 CRITICAL ANTI-DETECTION HEURISTICS:
 1. High Burstiness & Natural Rhythm:
    - Mix ultra-short 2-to-4 word sentences ("Don't do it.", "It failed.", "Zero exceptions.") with dense, highly specific 20-word technical explanations.
@@ -53,20 +72,22 @@ CRITICAL ANTI-DETECTION HEURISTICS:
    - Mention concrete technical levers: p99 latency, kernel namespaces, read-only tmpfs, memory footprints, CVEs, eBPF, gVisor vs microVMs.
 5. Visual Card Components:
    - card_title: A crisp 4-7 word engineering headline.
-   - card_pillars: Exactly 3 punchy, technical bullet points (under 12 words each) summarizing the core architectural principles.
+   - card_pillars: Exactly 3 punchy, technical bullet points (under 12 words each) summarizing the core principles.
    - ai_visual_prompt: A vivid prompt for OpenAI gpt-image-2.5-flare rendering a high-tech 3D architectural diagram or conceptual blueprint."""
 
 
 def write(story: RankedItem) -> dict:
     """Generates a complete post draft from a chosen ranked story."""
+    category = story.get("category", "ai_learning")
     user_prompt = (
         f"Chosen Story:\n"
+        f"Category: {category}\n"
         f"Title: {story.get('title', '')}\n"
         f"Source: {story.get('source', '')}\n"
         f"URL: {story.get('url', '')}\n"
         f"Summary: {story.get('summary', '')}\n"
         f"Selection Reason: {story.get('reason', '')}\n\n"
-        f"Draft a compelling, technically rigorous LinkedIn post based on this story."
+        f"Draft a compelling, technically rigorous LinkedIn post based on this {category.replace('_', ' ')} story."
     )
 
     try:

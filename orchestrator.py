@@ -53,18 +53,21 @@ class PipelineOrchestrator:
 
     def fetch_news(self, state: PipelineState) -> dict:
         topic = state.get("topic")
+        mode = state.get("mode")
         if topic:
-            logger.info("Fetching developer stories for topic: '%s'...", topic)
+            logger.info("Fetching developer stories for topic: '%s' (mode=%s)...", topic, mode)
         else:
-            logger.info("Fetching developer stories across engineering feeds...")
+            logger.info("Fetching developer stories across engineering feeds (mode=%s)...", mode)
 
         import inspect
         try:
             sig = inspect.signature(self.fetcher_fn)
+            kwargs = {}
             if "topic" in sig.parameters:
-                items = self.fetcher_fn(topic=topic)
-            else:
-                items = self.fetcher_fn()
+                kwargs["topic"] = topic
+            if "mode" in sig.parameters:
+                kwargs["mode"] = mode
+            items = self.fetcher_fn(**kwargs)
         except Exception:
             items = self.fetcher_fn()
 
@@ -73,7 +76,16 @@ class PipelineOrchestrator:
     def rank_news(self, state: PipelineState) -> dict:
         logger.info("Ranking news items...")
         raw_items = state.get("raw_items", [])
-        top5 = self.ranker_fn(raw_items)
+        mode = state.get("mode")
+        import inspect
+        try:
+            sig = inspect.signature(self.ranker_fn)
+            if "mode" in sig.parameters:
+                top5 = self.ranker_fn(raw_items, mode=mode)
+            else:
+                top5 = self.ranker_fn(raw_items)
+        except Exception:
+            top5 = self.ranker_fn(raw_items)
         return {"ranked_top5": top5}
 
     def await_story_choice(self, state: PipelineState) -> dict:

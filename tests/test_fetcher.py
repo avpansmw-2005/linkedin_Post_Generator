@@ -62,3 +62,42 @@ def test_exclude_corporate_fluff():
     assert not fetcher._is_relevant_developer_story("Startup raises $50M in seed funding round")
     assert not fetcher._is_relevant_developer_story("BigTech CEO steps down after antitrust lawsuit")
     assert fetcher._is_relevant_developer_story("Optimizing PostgreSQL query plans with indexing and btree")
+
+
+def test_parse_datetime_and_is_recent():
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+
+    # 1. Fresh date (2 hours ago)
+    fresh_dt = (now - timedelta(hours=2)).isoformat()
+    parsed_fresh = fetcher.parse_datetime(fresh_dt)
+    assert parsed_fresh is not None
+    assert fetcher.is_recent(fresh_dt, max_days=7) is True
+
+    # 2. Stale date (30 days ago)
+    stale_dt = (now - timedelta(days=30)).isoformat()
+    assert fetcher.is_recent(stale_dt, max_days=7) is False
+
+    # 3. Unix timestamp
+    ts_now = now.timestamp()
+    assert fetcher.is_recent(ts_now, max_days=7) is True
+    assert fetcher.is_recent(ts_now - 86400 * 15, max_days=7) is False
+
+
+def test_get_relative_time_str():
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+
+    two_hours_ago = (now - timedelta(hours=2)).isoformat()
+    assert "2h ago" in fetcher.get_relative_time_str(two_hours_ago)
+
+    yesterday = (now - timedelta(hours=26)).isoformat()
+    assert "yesterday" in fetcher.get_relative_time_str(yesterday)
+
+
+def test_classify_story():
+    assert fetcher._classify_story("Prisma pgbouncer bug postmortem") == fetcher.CATEGORY_DEVELOPER_MISTAKE
+    assert fetcher._classify_story("Top 5 mistakes developers make with RAG") == fetcher.CATEGORY_DEVELOPER_MISTAKE
+    assert fetcher._classify_story("Model Context Protocol (MCP) Tutorial and Architecture") == fetcher.CATEGORY_AI_LEARNING
+    assert fetcher._classify_story("DeepSeek v3 Foundation Model Release") == fetcher.CATEGORY_LATEST_NEWS
+

@@ -1,0 +1,30 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+
+# Environment files and credentials (CRITICAL: never bake secrets into image)
+.env
+.env.*
+!.env.example
+
+# Local SQLite databases and generated test media
+data/*.db
+data/images/*
+data/*.png
+
+# Git metadata
+.git/
+.gitignore
+
+# Scratch and test files
+tests/
+scratch/
+*.md
