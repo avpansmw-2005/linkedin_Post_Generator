@@ -195,5 +195,52 @@ def main():
     application.run_polling()
 
 
+# ==============================================================================
+# Vercel Serverless / ASGI Compatibility
+# ==============================================================================
+async def app(scope, receive, send):
+    """ASGI entrypoint allowing Vercel to serve the dashboard without error."""
+    if scope.get("type") == "http":
+        path = scope.get("path", "/")
+        clean_path = path.lstrip("/")
+        base_dir = os.path.join(os.path.dirname(__file__), "frontend")
+        
+        filename = clean_path if clean_path else "index.html"
+        filepath = os.path.join(base_dir, filename)
+
+        if not (os.path.exists(filepath) and os.path.isfile(filepath)):
+            filepath = os.path.join(base_dir, "index.html")
+
+        ext = os.path.splitext(filepath)[1].lower()
+        content_types = {
+            ".html": b"text/html; charset=utf-8",
+            ".css": b"text/css; charset=utf-8",
+            ".js": b"application/javascript; charset=utf-8",
+            ".json": b"application/json",
+            ".png": b"image/png",
+            ".svg": b"image/svg+xml",
+        }
+        content_type = content_types.get(ext, b"text/html; charset=utf-8")
+
+        try:
+            with open(filepath, "rb") as f:
+                body = f.read()
+        except Exception:
+            body = b"Not Found"
+
+        await send({
+            "type": "http.response.start",
+            "status": 200,
+            "headers": [
+                [b"content-type", content_type],
+                [b"content-length", str(len(body)).encode("ascii")],
+            ],
+        })
+        await send({
+            "type": "http.response.body",
+            "body": body,
+        })
+
+
 if __name__ == "__main__":
     main()
