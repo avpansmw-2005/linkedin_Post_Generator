@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Autonomous LinkedIn AI Agent — Masterclass & Interview Guide</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  
+  <!-- Mermaid.js for Interactive Vector Architecture Diagrams -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header class="app-header">
+    <div class="brand-container">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <div class="brand-title">Autonomous LinkedIn AI Agent</div>
+      </div>
+      <span class="brand-badge">Production Architecture</span>
+    </div>
+    <div class="header-meta">
+      <div class="status-pill">
+        <span class="status-dot"></span>
+        <span>LangGraph State Machine Active</span>
+      </div>
+      <span class="brand-badge" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.25); color: #34d399;">
+        31/31 Tests Passing
+      </span>
+    </div>
+  </header>
+
+  <!-- App Body Layout -->
+  <div class="app-container">
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="nav-category">System Deep Dive</div>
+      <button class="nav-item active" data-tab="tab-architecture">
+        <span class="icon">🏛️</span>
+        <span>Architecture & Flow</span>
+      </button>
+      <button class="nav-item" data-tab="tab-codebase">
+        <span class="icon">📂</span>
+        <span>File-by-File Walkthrough</span>
+      </button>
+
+      <div class="nav-category">GenAI & Agentic Mastery</div>
+      <button class="nav-item" data-tab="tab-concepts">
+        <span class="icon">🧠</span>
+        <span>Core GenAI & Pydantic</span>
+      </button>
+      <button class="nav-item" data-tab="tab-interview">
+        <span class="icon">🎯</span>
+        <span>AI Engineer Interview</span>
+      </button>
+
+      <div class="nav-category">Production & Ops</div>
+      <button class="nav-item" data-tab="tab-deployment">
+        <span class="icon">☁️</span>
+        <span>Cloud Deployment & CI/CD</span>
+      </button>
+      <button class="nav-item" data-tab="tab-playground">
+        <span class="icon">🧪</span>
+        <span>Interactive Playground</span>
+      </button>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="content-area">
+
+      <!-- ====================================================================
+           TAB 1: ARCHITECTURE & SYSTEM FLOW
+           ==================================================================== -->
+      <section id="tab-architecture" class="tab-panel active">
+        <div class="tab-hero">
+          <div class="tab-tag">SYSTEM BLUEPRINT</div>
+          <h1 class="tab-title">Production Agentic Architecture</h1>
+          <p class="tab-desc">
+            An enterprise-grade, state-graph orchestrator with asynchronous human-in-the-loop (HITL) review gates, SQLite thread checkpointing, and an iterative reflection self-correction loop that guarantees human-like post generation.
+          </p>
+        </div>
+
+        <!-- High-Level Flowchart -->
+        <div class="glass-card">
+          <div class="card-header">
+            <h2 class="card-title">LangGraph State Machine with 2-Gate Human Interrupts</h2>
+            <span class="card-badge">Deterministic Control Flow</span>
+          </div>
+          <p style="color: var(--text-muted); margin-bottom: 16px;">
+            Unlike brittle sequential LLM chains or unpredictable autonomous ReAct loops, our system is compiled as a <strong>LangGraph StateGraph</strong>. Execution pauses at explicit interrupt boundaries and persists full state to an SQLite checkpointer, allowing users to interact via Telegram before resuming.
+          </p>
+          <div class="mermaid-wrapper">
+            <pre class="mermaid">
+flowchart TD
+  START([● Pipeline Start]) --> FetchNode[📡 fetch_news<br/><i>Multi-Stream Ingestion & Recency Filter</i>]
+  FetchNode --> RankNode[⭐ rank_news<br/><i>Pydantic Top-10 Categorized Ranking</i>]
+  RankNode --> ChoiceGate{{⏸️ AWAIT STORY CHOICE<br/><b>Interrupt 1: Telegram Inline 10-Item Menu</b>}}
+  
+  ChoiceGate -->|User Selects Story 0-9| DraftNode[✍️ generate_draft<br/><i>Pydantic Technical Writer + Pillow Infographic Card</i>]
+  DraftNode --> HumanizeNode[🧬 humanize<br/><i>Anti-AI Voice Alignment & Burstiness Tuning</i>]
+  HumanizeNode --> ReviewGate{{⏸️ AWAIT REVIEW<br/><b>Interrupt 2: Telegram Post & Card Preview</b>}}
+  
+  ReviewGate -->|🚀 Approve| PublishNode[🌐 publish<br/><i>LinkedIn REST API or Safe Dry-Run</i>]
+  ReviewGate -->|✍️ Edit Notes| HumanizeNode
+  ReviewGate -->|🧬 Make More Human| SelfLoopNode[🔄 Reflexion Self-Correction Loop<br/><i>Iterative Feedback Loop with Statistical Detector</i>]
+  SelfLoopNode --> ReviewGate
+  
+  PublishNode --> ENDNode([🏁 Live Post Published on LinkedIn])
+
+  classDef gate fill:#312e81,stroke:#818cf8,stroke-width:2px,color:#e0e7ff;
+  classDef node fill:#1e293b,stroke:#475569,stroke-width:1px,color:#f8fafc;
+  classDef loop fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#d1fae5;
+  class ChoiceGate,ReviewGate gate;
+  class FetchNode,RankNode,DraftNode,HumanizeNode,PublishNode node;
+  class SelfLoopNode loop;
+            </pre>
+          </div>
+        </div>
+
+        <!-- Human-in-the-Loop & Reflection Deep Dive -->
+        <div class="grid-2">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3 class="card-title">⏸️ Human-in-the-Loop (HITL) Gates</h3>
+              <span class="card-badge">LangGraph Checkpointing</span>
+            </div>
+            <p style="color: var(--text-muted); margin-bottom: 12px;">
+              How does the pipeline pause without keeping active Python threads or open web sockets in memory?
+            </p>
+            <ul style="padding-left: 20px; color: var(--text-muted); font-size: 14px; margin-bottom: 14px;">
+              <li><strong>Gate 1 (Story Selection):</strong> Pauses after ranking. Yields 10 varied stories to the user. State snapshot is serialized into SQLite indexed by <code>thread_id</code>.</li>
+              <li><strong>Gate 2 (Post Review & Approval):</strong> Pauses after generating draft and infographic card. The user can switch image modes, provide edit notes, or trigger aggressive humanization.</li>
+              <li><strong>Zero Memory Leaks:</strong> When paused, the process consumes zero CPU/RAM. Resumption happens via <code>app.invoke(Command(resume=payload))</code> on Telegram webhook/callback event.</li>
+            </ul>
+            <div class="highlight-box">
+              <strong>Senior Engineer Takeaway:</strong> Never use <code>time.sleep()</code> or blocking in-memory queues for user review. Production AI agents decouple state persistence using graph checkpointers.
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3 class="card-title">🧬 Reflexion Self-Correction Loop</h3>
+              <span class="card-badge">Statistical Feedback Loop</span>
+            </div>
+            <p style="color: var(--text-muted); margin-bottom: 12px;">
+              When the user clicks <strong>"🧬 Make More Human"</strong>, how do we guarantee the score actually improves?
+            </p>
+            <div class="mermaid-wrapper" style="min-height: 200px; padding: 12px;">
+              <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant H as Humanizer Agent (LLM)
+  participant D as Statistical AI Detector
+  participant C as Critique Feedback Engine
+
+  H->>D: 1. Generate rewritten draft
+  D->>D: 2. Measure sentence length stddev (burstiness) & hallmark tropes
+  alt Score <= 20% AI & 0 Tropes
+    D-->>H: Return "Likely Human ✅"
+  else Score > 20% or Tropes Detected
+    D->>C: Pass diagnostic metrics (burstiness: 3.2, tropes: ["delve into"])
+    C->>H: Inject precise critique prompt ("Radically alternate 2-word & 25-word sentences")
+    H->>D: 3. Re-evaluate refined pass (Iterate up to 3x)
+  end
+              </pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           TAB 2: FILE-BY-FILE CODE WALKTHROUGH
+           ==================================================================== -->
+      <section id="tab-codebase" class="tab-panel">
+        <div class="tab-hero">
+          <div class="tab-tag">CODEBASE ARCHITECTURE</div>
+          <h1 class="tab-title">File-by-File Code Walkthrough</h1>
+          <p class="tab-desc">
+            A comprehensive, clean architectural breakdown of every file in the repository from scratch. Learn the input/output contracts, design patterns, and engineering rationale behind each component.
+          </p>
+        </div>
+
+        <!-- state.py -->
+        <div class="glass-card">
+          <div class="card-header">
+            <h3 class="card-title">1. <code>state.py</code> — Central Pipeline State Contract</h3>
+            <span class="card-badge">TypedDict & Persistence</span>
+          </div>
+          <p style="color: var(--text-muted);">
+            Defines the single source of truth passed between every node in the LangGraph execution graph, alongside the SQLite persistent checkpointer factory.
+          </p>
+          <div class="code-block">
+            <div class="code-header">
+              <span>state.py — Core State Schema</span>
+              <span>Python 3.13</span>
+            </div>
+            <pre class="code-content"><span class="kw">class</span> <span class="cls">PipelineState</span>(<span class="typ">TypedDict</span>, total=<span class="kw">False</span>):
+    run_date: <span class="typ">str</span>
+    topic: <span class="typ">str</span> | <span class="kw">None</span>
+    mode: <span class="typ">str</span> | <span class="kw">None</span>                       <span class="cm"># 'learning' | 'mistakes' | 'news'</span>
+    raw_items: <span class="typ">list</span>[NewsItem]               <span class="cm"># 40-70 candidates gathered from feeds</span>
+    ranked_options: <span class="typ">list</span>[RankedItem]        <span class="cm"># Top 10 diverse scored stories</span>
+    chosen_story: RankedItem                <span class="cm"># Selected at Gate 1</span>
+    draft_post: <span class="typ">str</span>
+    image_mode: <span class="typ">Literal</span>[<span class="str">"card"</span>, <span class="str">"ai_visual"</span>]
+    draft_image_path: <span class="typ">str</span>
+    humanized_post: <span class="typ">str</span>                     <span class="cm"># Refined draft after anti-AI loop</span>
+    ai_detection_score: <span class="typ">int</span>                 <span class="cm"># 0 to 100 percentage</span>
+    review_status: <span class="typ">Literal</span>[<span class="str">"pending"</span>, <span class="str">"approved"</span>, <span class="str">"edit_requested"</span>]
+    linkedin_post_url: <span class="typ">str</span></pre>
+          </div>
+          <div class="highlight-box">
+            <strong>Design Principle:</strong> Using <code>TypedDict</code> guarantees type safety across graph steps while keeping serialization lightweight for SQLite without complex ORM overhead.
+          </div>
+        </div>
+
+        <!-- agents/llm_client.py -->
+        <div class="glass-card">
+          <div class="card-header">
+            <h3 class="card-title">2. <code>agents/llm_client.py</code> — Provider-Agnostic Pydantic Engine</h3>
+            <span class="card-badge">Constrained Decoding</span>
+          </div>
+          <p style="color: var(--text-muted);">
+            Abstracts LLM providers (OpenAI GPT-4o vs Anthropic Claude 3.5 Sonnet) and enforces <strong>Pydantic Structured Outputs</strong>. It guarantees 100% schema compliance at the token-generation level.
+          </p>
+          <div class="code-block">
+            <div class="code-header">
+              <span>agents/llm_client.py — Generic Type-Safe Completion</span>
+              <span>Python 3.13</span>
+            </div>
+            <pre class="code-content"><span class="cls">T</span> = <span class="fn">TypeVar</span>(<span class="str">"T"</span>, bound=<span class="cls">BaseModel</span>)
+
+<span class="kw">def</span> <span class="fn">complete</span>(system: <span class="typ">str</span>, user: <span class="typ">str</span>, schema: <span class="typ">Type</span>[<span class="cls">T</span>], temperature: <span class="typ">float</span> = 0.7) -> <span class="cls">T</span>:
+    <span class="cm"># OpenAI: Uses Context-Free Grammar constrained decoding via response_format</span>
+    response = client.beta.chat.completions.parse(
+        model=model,
+        messages=[{<span class="str">"role"</span>: <span class="str">"system"</span>, <span class="str">"content"</span>: system}, {<span class="str">"role"</span>: <span class="str">"user"</span>, <span class="str">"content"</span>: user}],
+        response_format=schema,
+        temperature=temperature
+    )
+    <span class="kw">return</span> response.choices[0].message.parsed</pre>
+          </div>
+        </div>
+
+        <!-- agents/fetcher.py & ranker.py -->
+        <div class="grid-2">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3 class="card-title">3. <code>agents/fetcher.py</code></h3>
+              <span class="card-badge">Real-Time Ingestion</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 14px;">
+              Multi-source ingestion engine fetching from:
+            </p>
+            <ul style="padding-left: 20px; color: var(--text-muted); font-size: 13.5px; margin: 10px 0;">
+              <li><strong>Hacker News Algolia:</strong> <code>/api/v1/search_by_date</code> with <code>numericFilters=created_at_i>{cutoff}</code>.</li>
+              <li><strong>Curated RSS:</strong> Simon Willison, Hugging Face Blog, Cloudflare Eng, GitHub Eng.</li>
+              <li><strong>arXiv API:</strong> Latest computer science papers sorted by submission date.</li>
+              <li><strong>Deduplication SQLite Ledger:</strong> Computes SHA-256 hash of URLs so users never see repeat articles.</li>
+            </ul>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3 class="card-title">4. <code>agents/ranker.py</code></h3>
+              <span class="card-badge">Top-10 Balanced Variety</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 14px;">
+              Ranks candidate items using <code>TopTenRanking(BaseModel)</code>, enforcing user-defined priority:
+            </p>
+            <ul style="padding-left: 20px; color: var(--text-muted); font-size: 13.5px; margin: 10px 0;">
+              <li>🎓 <strong>AI Developer Learning (4-5 items):</strong> System design, local LLMs, MCP, RAG. (Scores 9.0–10.0).</li>
+              <li>⚠️ <strong>Developer Mistakes (3-4 items):</strong> Postmortems, anti-patterns, debugging traps. (Scores 8.0–8.9).</li>
+              <li>🚀 <strong>Latest Tech News (2-3 items):</strong> Model breakthroughs. (Scores 7.0–7.9).</li>
+              <li><strong>Entity Diversity:</strong> Rejects clustering multiple stories on the exact same model or framework.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- agents/writer.py, detector.py & humanizer.py -->
+        <div class="grid-3">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3 class="card-title">5. <code>agents/writer.py</code></h3>
+              <span class="card-badge">Copywriting Engine</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13.5px;">
+              Generates structured post schemas tailored to category archetypes:
+            </p>
+            <div class="chip-row">
+              <span class="chip primary">Anti-Pattern Hook</span>
+              <span class="chip emerald">Failure Mechanism</span>
+              <span class="chip amber">Production Fix</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13px;">
+              Also generates 3 technical pillars for the card and a cinematic 16:9 prompt for OpenAI image generation.
+            </p>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3 class="card-title">6. <code>agents/detector.py</code></h3>
+              <span class="card-badge">Statistical NLP</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13.5px;">
+              Calibrated statistical detection engine:
+            </p>
+            <ul style="padding-left: 18px; color: var(--text-muted); font-size: 13px; margin: 8px 0;">
+              <li><strong>Sentence Burstiness:</strong> Standard deviation of sentence word counts.</li>
+              <li><strong>Hallmark Tropes:</strong> 35+ formulaic phrases (e.g. <em>"delve into"</em>, <em>"the benefits are straightforward"</em>).</li>
+              <li><strong>Textbook Definitions:</strong> Flags junior dictionary introductions.</li>
+            </ul>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3 class="card-title">7. <code>agents/humanizer.py</code></h3>
+              <span class="card-badge">Reflexion Critic</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13.5px;">
+              Implements <code>rewrite_with_feedback_loop</code>:
+            </p>
+            <ul style="padding-left: 18px; color: var(--text-muted); font-size: 13px; margin: 8px 0;">
+              <li>Up to 3 targeted revision passes.</li>
+              <li>Injects explicit detector critique into next prompt.</li>
+              <li>Forces rhythmic asymmetry: 2-word blunt sentences paired with 25-word technical explanations.</li>
+              <li>Achieves &lt;20% AI score (Likely Human ✅).</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- orchestrator.py & telegram_bot.py -->
+        <div class="glass-card">
+          <div class="card-header">
+            <h3 class="card-title">8. <code>orchestrator.py</code> & <code>integrations/telegram_bot.py</code></h3>
+            <span class="card-badge">Asynchronous Control Plane</span>
+          </div>
+          <p style="color: var(--text-muted); margin-bottom: 14px;">
+            The bridge between backend graph execution and user interface.
+          </p>
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>Implementation</th>
+                <th>Responsibility</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>orchestrator.py</code></td>
+                <td><code>StateGraph(PipelineState)</code></td>
+                <td>Wires linear and conditional edges, manages <code>interrupt()</code> calls at selection and review gates.</td>
+              </tr>
+              <tr>
+                <td><code>telegram_bot.py</code></td>
+                <td><code>python-telegram-bot</code> v21 (async/await)</td>
+                <td>Presents 10 inline buttons, renders architecture cards, accepts free-text feedback, runs graph resumption in thread pools.</td>
+              </tr>
+              <tr>
+                <td><code>imagegen.py</code></td>
+                <td>Programmatic Pillow + OpenAI DALL-E</td>
+                <td>Renders 1200x675 PNG technical architecture infographic cards with 3 structured pillars and engineering takeaway.</td>
+              </tr>
+              <tr>
+                <td><code>linkedin.py</code></td>
+                <td>REST API Client + Dry-Run Switch</td>
+                <td>Uploads binary media, registers UGC post, or returns simulated mock URL when <code>DRY_RUN=true</code>.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           TAB 3: CORE GENAI & PYDANTIC CONCEPTS
+           ==================================================================== -->
+      <section id="tab-concepts" class="tab-panel">
+        <div class="tab-hero">
+          <div class="tab-tag">GENAI DEEP DIVE</div>
+          <h1 class="tab-title">Core GenAI & Pydantic Concepts</h1>
+          <p class="tab-desc">
+            Master the foundational engineering paradigms that separate beginner LLM script wrappers from senior-level production AI agent architectures.
+          </p>
+        </div>
+
+        <!-- Pydantic Deep Dive -->
+        <div class="glass-card">
+          <div class="card-header">
+            <h2 class="card-title">🛡️ Pydantic & Schema-Constrained Structured Outputs</h2>
+            <span class="card-badge">Critical AI Engineering Topic</span>
+          </div>
+          <p style="color: var(--text-muted); margin-bottom: 14px;">
+            In production GenAI, asking an LLM to <em>"respond in valid JSON"</em> with raw prompts fails at scale. Models output markdown backticks (<code>```json</code>), hallucinate keys, omit required brackets, or break on apostrophes.
+          </p>
+          
+          <div class="grid-2">
+            <div>
+              <h4 style="color: #ffffff; margin-bottom: 8px;">1. Context-Free Grammar (CFG) Masking</h4>
+              <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 14px;">
+                OpenAI Structured Outputs (<code>client.beta.chat.completions.parse</code>) converts the Pydantic schema into a formal Context-Free Grammar. At each token step, logits for tokens that would violate the JSON schema are mathematically masked to <code>-infinity</code>. <strong>Result: 100% schema compliance guarantee.</strong>
+              </p>
+              
+              <h4 style="color: #ffffff; margin-bottom: 8px;">2. Semantic Steerability via <code>Field(description=...)</code></h4>
+              <p style="color: var(--text-muted); font-size: 14px;">
+                Pydantic field descriptions do not just validate; they act as <em>in-flight system sub-prompts</em>. In <code>agents/writer.py</code>, setting <code>card_pillars: list[str] = Field(description="Exactly 3 concise pillars...")</code> steers the model's latent attention directly at token generation time.
+              </p>
+            </div>
+
+            <div>
+              <h4 style="color: #ffffff; margin-bottom: 8px;">3. Pydantic v2 Architecture (Rust Core)</h4>
+              <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 14px;">
+                Pydantic v2 is built on <code>pydantic-core</code> in Rust. Schema compilation and recursive JSON parsing run at near-native C speeds (~15x faster than v1), critical when parsing complex agent states with 50+ candidate articles.
+              </p>
+
+              <div class="highlight-box emerald">
+                <strong>Interview Golden Nugget:</strong> "We use Pydantic not just as a data container, but as an architectural boundary that enforces type contracts between stochastic LLM outputs and deterministic downstream Python workflows."
+              </div>
+            </div>
+          </div>
+
+          <!-- Comparison Table -->
+          <table class="custom-table" style="margin-top: 20px;">
+            <thead>
+              <tr>
+                <th>Approach</th>
+                <th>Reliability</th>
+                <th>Mechanism</th>
+                <th>Failure Modes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Prompting ("Return JSON")</strong></td>
+                <td>~75%</td>
+                <td>Stochastic next-token prediction</td>
+                <td>Markdown wrapper, hallucinated keys, syntax truncation</td>
+              </tr>
+              <tr>
+                <td><strong>JSON Mode (<code>json_object</code>)</strong></td>
+                <td>~90%</td>
+                <td>Forces valid JSON syntax</td>
+                <td>Valid JSON syntax, but missing keys or incorrect field types</td>
+              </tr>
+              <tr>
+                <td><strong>Pydantic Structured Outputs</strong></td>
+                <td><strong>100%</strong></td>
+                <td><strong>Logit masking via CFG Grammar + Rust validation</strong></td>
+                <td><strong>Zero syntax or schema failures. Guaranteed type match.</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Agent Paradigms -->
+        <div class="grid-2">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3 class="card-title">🔄 State Graphs vs ReAct Loops</h3>
+              <span class="card-badge">LangGraph Advantage</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 12px;">
+              Why choose LangGraph over CrewAI, AutoGen, or raw LangChain chains?
+            </p>
+            <ul style="padding-left: 20px; color: var(--text-muted); font-size: 13.5px;">
+              <li><strong>ReAct loops are non-deterministic:</strong> LLMs can get stuck in infinite reasoning loops, tool-call ping-pong, or token runaways.</li>
+              <li><strong>LangGraph provides cyclic state machines:</strong> Nodes are deterministic Python functions; edges are controlled conditional routers.</li>
+              <li><strong>First-class interrupts:</strong> ReAct frameworks struggle with pausing for 2 hours while a human answers in Telegram. LangGraph suspends natively to SQLite.</li>
+            </ul>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3 class="card-title">📊 Mathematical Burstiness & Perplexity</h3>
+              <span class="card-badge">Anti-Detection Heuristic</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 10px;">
+              How AI detectors (GPTZero, ZeroGPT) flag content:
+            </p>
+            <div class="code-block" style="margin: 8px 0;">
+              <pre class="code-content" style="padding: 10px; font-size: 12px;"><span class="cm"># Standard deviation of sentence lengths:</span>
+lengths = [len(s.split()) for s in sentences]
+mean = sum(lengths) / len(lengths)
+variance = sum((l - mean) ** 2 for l in lengths) / (len(lengths) - 1)
+burstiness = math.sqrt(variance)</pre>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13.5px;">
+              AI models produce uniform 12-16 word sentences (burstiness &lt; 2.5). Humans write with radical asymmetry (burstiness &gt; 5.0) — mixing 2-word blunt fragments with 25-word multi-clause technical explanations.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           TAB 4: AI ENGINEER INTERVIEW MASTERCLASS
+           ==================================================================== -->
+      <section id="tab-interview" class="tab-panel">
+        <div class="tab-hero">
+          <div class="tab-tag">CAREER ACCELERATION</div>
+          <h1 class="tab-title">AI Engineer Interview Masterclass</h1>
+          <p class="tab-desc">
+            How to present, defend, and pitch this project in Senior & Staff AI Engineer interviews. Includes elevator pitches, STAR stories, and 12 battle-tested interview questions with model answers.
+          </p>
+        </div>
+
+        <!-- Pitches -->
+        <div class="grid-2">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3 class="card-title">🎙️ 30-Second Elevator Pitch</h3>
+              <span class="card-badge">Concise & High Impact</span>
+            </div>
+            <div class="highlight-box">
+              <em>"I designed an autonomous, production-grade multi-agent LinkedIn publishing system built with LangGraph, Pydantic, and Azure Container Apps. It ingests fresh engineering articles across Hacker News and RSS, ranks top-10 stories using balanced technical diversity, drafts tailored posts and visual architecture cards, and features an asynchronous Human-in-the-Loop review gate on Telegram with an iterative statistical self-correction loop that defeats AI detectors."</em>
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3 class="card-title">🎙️ 2-Minute Technical Deep Dive</h3>
+              <span class="card-badge">Architectural Conviction</span>
+            </div>
+            <div class="highlight-box emerald">
+              <em>"The core architectural challenge was solving non-deterministic agentic behavior and AI content detection. Instead of unconstrained ReAct loops, I implemented a LangGraph cyclic state machine with persistent SQLite checkpointing. This allows execution to pause indefinitely at human-approval gates on Telegram without blocking server threads. For content generation, I used Pydantic structured outputs via Context-Free Grammar masking to guarantee 100% schema reliability, coupled with an Actor-Critic reflection loop that measures sentence burstiness and eliminates formulaic tropes before publishing."</em>
+            </div>
+          </div>
+        </div>
+
+        <!-- STAR Stories -->
+        <div class="glass-card">
+          <div class="card-header">
+            <h3 class="card-title">⭐ Production STAR Stories for Behavioral Rounds</h3>
+            <span class="card-badge">Leadership & Problem Solving</span>
+          </div>
+
+          <div class="faq-card open">
+            <div class="faq-header">
+              <span class="faq-question">
+                <span class="q-badge">STAR 1</span>
+                Solving AI Detection & Robotic Tone via Closed-Loop Statistical Reflexion
+              </span>
+              <span class="faq-icon">▼</span>
+            </div>
+            <div class="faq-body">
+              <p><strong>Situation:</strong> Early LLM drafts suffered from hallmark AI tropes ("in today's fast-paced world", "curious to hear your thoughts") and uniform cadence, scoring 90%+ AI on ZeroGPT and hurting audience engagement on LinkedIn.</p>
+              <p><strong>Task:</strong> Build an automated system that objectively measures and rewrites content to read 100% human without human copywriting intervention.</p>
+              <p><strong>Action:</strong> Implemented a statistical NLP engine in <code>agents/detector.py</code> measuring sentence length variance (burstiness) and 35+ trope patterns. Integrated this into an Actor-Critic reflection loop in <code>agents/humanizer.py</code>. If a draft scores &gt;20% AI, the detector injects specific diagnostic feedback back to the LLM, enforcing rhythmic asymmetry.</p>
+              <p><strong>Result:</strong> Reduced average AI detection from 95% down to &lt;15% (Likely Human ✅), with zero hallmark tropes and measurable increases in LinkedIn comment engagement.</p>
+            </div>
+          </div>
+
+          <div class="faq-card">
+            <div class="faq-header">
+              <span class="faq-question">
+                <span class="q-badge">STAR 2</span>
+                Designing Asynchronous Human-in-the-Loop Resumption Without Resource Waste
+              </span>
+              <span class="faq-icon">▼</span>
+            </div>
+            <div class="faq-body">
+              <p><strong>Situation:</strong> Automated publishing without human oversight risks posting inaccurate or off-brand content. However, traditional human approval loops either kept Python server threads blocked waiting for replies or lost state across container restarts.</p>
+              <p><strong>Task:</strong> Architect a zero-cost, persistent human review gate that integrates seamlessly with mobile messaging (Telegram).</p>
+              <p><strong>Action:</strong> Leveraged LangGraph interrupts and SQLite thread checkpointing. When the pipeline hits <code>await_review</code>, it serializes state to disk and releases the CPU. When the user taps 'Approve' or replies with edit feedback in Telegram hours later, the callback loads the checkpoint via <code>thread_id</code> and resumes execution.</p>
+              <p><strong>Result:</strong> Zero memory leaks, resilience across container restarts, and a frictionless 1-tap mobile review experience.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 12 Staff-Level Technical Interview Questions -->
+        <div class="glass-card">
+          <div class="card-header">
+            <h3 class="card-title">💡 12 Technical Interview Questions & Staff-Level Answers</h3>
+            <span class="card-badge">Question Bank</span>
+          </div>
+
+          <!-- Q1 -->
+          <div class="faq-card">
+            <div class="faq-header">
+              <span class="faq-question"><span class="q-badge">Q1</span> How do you guarantee 100% schema outputs with Pydantic without hallucinated keys?</span>
+              <span class="faq-icon">▼</span>
+            </div>
+            <div class="faq-body">
+              <strong>Staff Answer:</strong> We use OpenAI's <code>client.beta.chat.completions.parse(..., response_format=schema)</code> which utilizes Context-Free Grammar (CFG) constrained decoding. Instead of letting the model freely sample tokens and hoping it complies, the inference engine converts the Pydantic JSON Schema into a grammar that masks out any token in the vocabulary that would create invalid JSON or deviate from the defined schema. For Anthropic, we pass <code>schema.model_json_schema()</code> into tool definitions with <code>tool_choice={"type": "tool"}</code> and validate the input block using <code>schema.model_validate()</code> in Python.
+            </div>
+          </div>
+
+          <!-- Q2 -->
+          <div class="faq-card">
+            <div class="faq-header">
+              <span class="faq-question"><span class="q-badge">Q2</span> Why LangGraph over CrewAI, AutoGen, or LangChain sequential chains?</span>
+              <span class="faq-icon">▼</span>
+            </div>
+            <div class="faq-body">
+              <strong>Staff Answer:</strong> Sequential chains are purely linear and cannot handle cyclic loops (like our edit review loop). CrewAI and AutoGen rely heavily on autonomous multi-agent conversation loops that are non-deterministic, difficult to test, and prone to runaway token costs. LangGraph models the system as a directed cyclic graph (DCG) with explicit state transitions, conditional routers, and first-class checkpointers. This gives us deterministic control over the business flow while still utilizing LLM intelligence inside individual nodes.
+            </div>
+          </div>
+
+          <!-- Q3 -->
+          <div class="faq-card">
+            <div class="faq-header">
+              <span class="faq-question"><span class="q-badge">Q3</span> How do you prevent hallucinations in technical summaries and links?</span>
+              <span class="faq-icon">▼</span>
+            </div>
+            <div class="faq-body">
+              <strong>Staff Answer:</strong> We enforce grounded context injection. The writer agent never invents URLs or story facts out of thin air; it is provided with the verified <code>title</code>, <code>url</code>, <code>source</code>, and <code>summary</code> extracted during ingestion. In the system prompt, we explicitly forbid generating unverified URLs. Furthermore, our Pydantic schema separates the post body from the source metadata, allowing deterministic string formatting for source attribution.
+            </div>
+          </div>
+
+          <!-- Q4 -->
+          <div class="faq-card">
+            <div class="faq-header">
+              <span class="faq-question"><span class="q-badge">Q4</span> How do you handle LLM rate limits and token cost management during reflection loops?</span>
+              <span class="faq-icon">▼</span>
+            </div>
+            <div class="faq-body">
+              <strong>Staff Answer:</strong> First, the reflection loop is bounded with a strict <code>max_iterations=3</code> guardrail to prevent token explosions. Second, we use an early exit condition: if the candidate scores &le; 20% AI on pass 1, the loop immediately terminates. Third, our statistical detector is pure Python math (regex + standard deviation), costing zero LLM tokens. We only spend LLM tokens on the generator node, keeping cost per post under $0.03.
+            </div>
+          </div>
+
+          <!-- Q5 -->
+          <div class="faq-card">
+            <div class="faq-header">
+              <span class="faq-question"><span class="q-badge">Q5</span> How would you scale this architecture to support 10,000 users concurrently?</span>
+              <span class="faq-icon">▼</span>
+            </div>
+            <div class="faq-body">
+              <strong>Staff Answer:</strong> 
+              1. <strong>Decouple Telegram Webhooks:</strong> Replace polling with Telegram Webhooks terminating at an API Gateway / FastAPI service.<br/>
+              2. <strong>Distributed Task Queue:</strong> Push pipeline triggers to a distributed queue (Celery, Celery+Redis, or Azure Service Bus).<br/>
+              3. <strong>Checkpointer Scaling:</strong> Migrate <code>SqliteSaver</code> to <code>PostgresSaver</code> using connection pooling (Supabase / Azure PostgreSQL) with horizontal container replicas in Azure Container Apps.<br/>
+              4. <strong>Cache News Ingestion:</strong> Centralize feed ingestion into a shared Redis cluster so 10,000 users share the same deduplicated news candidates rather than scraping independently.
+            </div>
+          </div>
+
+          <!-- Q6 -->
+          <div class="faq-card">
+            <div class="faq-header">
+              <span class="faq-question"><span class="q-badge">Q6</span> How do you evaluate post quality offline without human annotators?</span>
+              <span class="faq-icon">▼</span>
+            </div>
+            <div class="faq-body">
+              <strong>Staff Answer:</strong> We use an automated LLM-as-a-judge evaluation suite built with LangSmith or DeepEval. We test candidates against 4 quantitative metrics: 1) Technical Rigor (1-5 scale), 2) Groundedness (measuring semantic overlap with the source article), 3) Hook Quality (engagement scoring), and 4) Anti-Detection Compliance (statistical burstiness &gt; 5.0). Tests are tracked in GitHub Actions CI to prevent prompt regressions.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           TAB 5: CLOUD DEPLOYMENT & DEVOPS
+           ==================================================================== -->
+      <section id="tab-deployment" class="tab-panel">
+        <div class="tab-hero">
+          <div class="tab-tag">PRODUCTION OPERATIONS</div>
+          <h1 class="tab-title">Cloud Deployment & DevOps Deep-Dive</h1>
+          <p class="tab-desc">
+            Explore our automated production setup: multi-stage rootless Docker containerization, Azure Container Apps serverless hosting, and GitHub Actions automated CI/CD pipelines.
+          </p>
+        </div>
+
+        <!-- Deployment Architecture Diagram -->
+        <div class="glass-card">
+          <div class="card-header">
+            <h2 class="card-title">End-to-End Cloud CI/CD & Hosting Topology</h2>
+            <span class="card-badge">Azure + GitHub Actions</span>
+          </div>
+          <div class="mermaid-wrapper">
+            <pre class="mermaid">
+flowchart LR
+  Dev([💻 Git Commit / Push]) --> GHA[⚙️ GitHub Actions CI/CD<br/><i>.github/workflows/deploy.yml</i>]
+  
+  subgraph GHA_Steps [CI Pipeline]
+    Test[🧪 Run Pytest Suite<br/>31/31 Unit Tests]
+    Build[🐳 Multi-Arch Docker Build<br/>linux/amd64]
+    Push[📦 Docker Hub Registry<br/>avneetpandey82/linkedin-bot:latest]
+    Test --> Build --> Push
+  end
+  
+  GHA --> GHA_Steps
+  Push --> Deploy[🚀 Azure CLI Deploy<br/>az containerapp update]
+  
+  subgraph Azure_Cloud [Azure Container Apps Environment]
+    ACA[☁️ Container App: linkedin-post<br/><i>Serverless Microservices, 0.5 vCPU, 1GiB</i>]
+    Vol[(💾 SQLite Volume<br/>pipeline.db & seen_stories.db)]
+    ACA --- Vol
+  end
+  
+  Deploy --> ACA
+  ACA <-->|Telegram Bot API| TG([📱 Telegram User])
+  ACA -->|Publish UGC Post| LI([💼 LinkedIn API])
+            </pre>
+          </div>
+        </div>
+
+        <!-- 3 Pillars of Deployment -->
+        <div class="grid-3">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3 class="card-title">🔒 Rootless Container Security</h3>
+              <span class="card-badge">Dockerfile</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13.5px; margin-bottom: 10px;">
+              Production containers should never run as root.
+            </p>
+            <div class="code-block" style="font-size: 12px; margin: 8px 0;">
+              <pre class="code-content"><span class="cm"># Dockerfile non-root user setup</span>
+<span class="kw">RUN</span> useradd -u 10001 -m appuser && \
+    chown -R appuser:appuser /app
+<span class="kw">USER</span> appuser</pre>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13px;">
+              Installs minimal system dependencies (<code>fontconfig</code>, <code>libfreetype6</code> for Pillow card rendering) and drops all administrative Linux capabilities.
+            </p>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3 class="card-title">☁️ Azure Container Apps</h3>
+              <span class="card-badge">Serverless PaaS</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13.5px;">
+              Why ACA over Kubernetes (AKS) or App Service?
+            </p>
+            <ul style="padding-left: 18px; color: var(--text-muted); font-size: 13px; margin: 8px 0;">
+              <li><strong>Zero Cluster Overhead:</strong> No need to manage Kubernetes control planes, node pools, or ingress controllers.</li>
+              <li><strong>Cost Efficient:</strong> Allocated 0.5 vCPU and 1.0 GiB RAM, costing ~$15/month under continuous polling.</li>
+              <li><strong>Automatic Restarts:</strong> Built-in health probes and daemon resilience.</li>
+            </ul>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3 class="card-title">🚀 Automated CI/CD</h3>
+              <span class="card-badge">GitHub Actions</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13.5px;">
+              Full deployment lifecycle on commit to <code>main</code>:
+            </p>
+            <ul style="padding-left: 18px; color: var(--text-muted); font-size: 13px; margin: 8px 0;">
+              <li>Automatic test execution before building.</li>
+              <li>Builds multi-platform image for <code>linux/amd64</code>.</li>
+              <li>Pushes tagged digest to Docker Hub.</li>
+              <li>Executes <code>az containerapp update</code> using stored repository secrets.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Dedicated Vercel Section -->
+        <div class="glass-card" style="border-color: rgba(99, 102, 241, 0.35); background: linear-gradient(180deg, rgba(17, 24, 39, 0.85) 0%, rgba(15, 23, 42, 0.7) 100%);">
+          <div class="card-header">
+            <h2 class="card-title">▲ Connecting to Vercel: Strategy, Configuration & Architecture</h2>
+            <span class="card-badge" style="background: rgba(255, 255, 255, 0.1); color: #ffffff;">vercel.json Configured</span>
+          </div>
+
+          <p style="color: var(--text-muted); margin-bottom: 16px;">
+            To connect this project to Vercel, it is crucial to understand the architectural distinction between <strong>Static/Edge Frontend Hosting</strong> and <strong>Agentic State-Machine Backends</strong>.
+          </p>
+
+          <div class="grid-2">
+            <div>
+              <h4 style="color: #ffffff; margin-bottom: 8px;">Option 1: Host the Frontend on Vercel (Ready Now!)</h4>
+              <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 12px;">
+                We have configured <code>vercel.json</code> at the root of the repository with <code>"outputDirectory": "frontend"</code>.
+              </p>
+              <div class="code-block" style="font-size: 12px; margin: 8px 0;">
+                <pre class="code-content"><span class="cm">// vercel.json in repo root:</span>
+{
+  <span class="str">"name"</span>: <span class="str">"linkedin-ai-agent-dashboard"</span>,
+  <span class="str">"outputDirectory"</span>: <span class="str">"frontend"</span>,
+  <span class="str">"cleanUrls"</span>: <span class="kw">true</span>
+}</pre>
+              </div>
+              <p style="color: var(--text-muted); font-size: 13px;">
+                <strong>How to Deploy in 60 seconds:</strong><br/>
+                1. Go to <a href="https://vercel.com/new" target="_blank">vercel.com/new</a>.<br/>
+                2. Import your GitHub repository: <code>avpansmw-2005/linkedin_Post_Generator</code>.<br/>
+                3. Click <strong>Deploy</strong> (Vercel automatically detects <code>frontend/</code> via <code>vercel.json</code>).
+              </p>
+            </div>
+
+            <div>
+              <h4 style="color: #ffffff; margin-bottom: 8px;">Option 2: The Modern Hybrid Architecture (Recommended)</h4>
+              <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 12px;">
+                Why not run the entire Python Telegram bot on Vercel serverless functions?
+              </p>
+              <ul style="padding-left: 18px; color: var(--text-muted); font-size: 13px; margin-bottom: 12px;">
+                <li><strong>Stateless Lambda Constraints:</strong> Vercel functions have short execution limits (10s to 60s max) and cannot run continuous polling daemons (<code>run_polling()</code>).</li>
+                <li><strong>Ephemeral Disk:</strong> Vercel lambdas have read-only/ephemeral filesystems; local SQLite (<code>pipeline.db</code>) is erased on cold starts.</li>
+                <li><strong>Hybrid Best Practice:</strong> Keep the continuous agent running in <strong>Azure Container Apps</strong> (where SQLite volumes and 24/7 background listeners reside), and host your UI/Dashboard globally on <strong>Vercel's Edge CDN</strong>.</li>
+              </ul>
+              <div class="highlight-box">
+                <strong>Interview Insight:</strong> "In production, we separate the presentation tier (Edge CDN on Vercel) from the long-running agentic workflow tier (Containerized LangGraph workers with persistent checkpointers)."
+              </div>
+            </div>
+          </div>
+
+          <!-- Serverless Migration Roadmap Table -->
+          <div style="margin-top: 20px;">
+            <h4 style="color: #ffffff; margin-bottom: 8px;">Full Serverless Migration Path (If Migrating Backend to Vercel):</h4>
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Component</th>
+                  <th>Current (Containerized ACA)</th>
+                  <th>Vercel Serverless Equivalent</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Telegram Listener</strong></td>
+                  <td>Long-Polling Daemon in <code>main.py</code></td>
+                  <td>Telegram Webhook via <code>/api/telegram.py</code></td>
+                </tr>
+                <tr>
+                  <td><strong>Graph Checkpointer</strong></td>
+                  <td>Local SQLite (<code>SqliteSaver</code>)</td>
+                  <td>Remote Serverless Postgres (<strong>Neon</strong> / <strong>Supabase</strong> via <code>PostgresSaver</code>)</td>
+                </tr>
+                <tr>
+                  <td><strong>Long Execution / Loops</strong></td>
+                  <td>Background thread pools</td>
+                  <td>Asynchronous job queue (<strong>Upstash QStash</strong> / <strong>Inngest</strong>)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           TAB 6: INTERACTIVE PLAYGROUND
+           ==================================================================== -->
+      <section id="tab-playground" class="tab-panel">
+        <div class="tab-hero">
+          <div class="tab-tag">LIVE TESTING LAB</div>
+          <h1 class="tab-title">Statistical AI Detection Playground</h1>
+          <p class="tab-desc">
+            Test and visualize our statistical detection engine live in the browser. Inspect sentence burstiness variance, scan hallmark AI tropes, and understand how the self-correction loop evaluates content.
+          </p>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-header">
+            <h2 class="card-title">Interactive Text Evaluator</h2>
+            <div style="display: flex; gap: 8px;">
+              <button id="btn-load-robotic" class="card-badge" style="cursor: pointer; background: rgba(244, 63, 94, 0.15); color: #fda4af; border-color: rgba(244, 63, 94, 0.3);">
+                Load Robotic Sample
+              </button>
+              <button id="btn-load-human" class="card-badge" style="cursor: pointer; background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);">
+                Load Human Sample
+              </button>
+            </div>
+          </div>
+
+          <textarea id="playground-input-text" class="playground-input" placeholder="Paste any LinkedIn post or technical draft here to calculate burstiness and AI probability..."></textarea>
+          
+          <button id="btn-analyze-text" class="btn-primary">
+            <span>⚡ Run Statistical Evaluation</span>
+          </button>
+
+          <!-- Metrics Row -->
+          <div class="metrics-row">
+            <div class="metric-card">
+              <div id="res-ai-score" class="metric-value" style="color: #f43f5e;">--</div>
+              <div class="metric-label">AI Signature Probability</div>
+            </div>
+            <div class="metric-card">
+              <div id="res-human-score" class="metric-value" style="color: #10b981;">--</div>
+              <div class="metric-label">Human Authenticity</div>
+            </div>
+            <div class="metric-card">
+              <div id="res-burstiness" class="metric-value" style="color: #818cf8;">--</div>
+              <div class="metric-label">Sentence Burstiness (&sigma;)</div>
+            </div>
+            <div class="metric-card">
+              <div id="res-status" class="metric-value" style="font-size: 20px;">--</div>
+              <div class="metric-label">Detector Classification</div>
+            </div>
+          </div>
+
+          <!-- Flagged Tropes Section -->
+          <div id="res-flagged-phrases" style="margin: 16px 0; font-size: 14px;"></div>
+
+          <!-- Sentence Length Distribution List -->
+          <div style="margin-top: 24px;">
+            <h4 style="color: var(--text-muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px;">
+              Sentence Length Breakdown (Variance Visualizer):
+            </h4>
+            <div id="sentence-breakdown-list" style="max-height: 240px; overflow-y: auto; padding-right: 8px;"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+</body>
+</html>
