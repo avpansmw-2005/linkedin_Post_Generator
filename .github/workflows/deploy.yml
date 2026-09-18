@@ -8,8 +8,8 @@ on:
 
 env:
   DOCKER_IMAGE_NAME: avneetpandey82/linkedin-bot
-  AZURE_CONTAINER_APP_NAME: ca-linkedin-bot
-  AZURE_RESOURCE_GROUP: rg-linkedin-bot
+  AZURE_CONTAINER_APP_NAME: linkedin-post
+  AZURE_RESOURCE_GROUP: linkedin-post-alert
 
 jobs:
   build-and-deploy:
