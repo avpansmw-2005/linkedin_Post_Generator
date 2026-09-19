@@ -51,7 +51,8 @@ def _complete_openai(system: str, user: str, schema: Type[T], temperature: float
         raise RuntimeError("OPENAI_API_KEY environment variable is not set in .env")
 
     model = os.getenv("OPENAI_MODEL", "gpt-4o")
-    client = OpenAI(api_key=api_key)
+    timeout = float(os.getenv("OPENAI_TIMEOUT", "15.0"))
+    client = OpenAI(api_key=api_key, timeout=timeout)
 
     logger.debug("Calling OpenAI model %s with schema %s", model, schema.__name__)
     response = client.beta.chat.completions.parse(

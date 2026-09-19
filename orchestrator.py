@@ -112,12 +112,19 @@ class PipelineOrchestrator:
         except TypeError:
             image_path = self.imagegen_fn(chosen, draft)
 
+        first_comment = draft.get("first_comment") or ""
+        if not first_comment and chosen.get("url"):
+            first_comment = f"Here's the link to the paper & discussion 👇\n{chosen.get('url')}"
+
         return {
             "draft_post": draft.get("text", ""),
             "draft_hashtags": draft.get("tags", []),
             "draft_metadata": draft,
             "image_mode": image_mode,
             "draft_image_path": image_path,
+            "code_snippet": draft.get("code_snippet"),
+            "benchmark_stat": draft.get("benchmark_stat"),
+            "first_comment": first_comment,
         }
 
     def humanize(self, state: PipelineState) -> dict:
@@ -141,9 +148,12 @@ class PipelineOrchestrator:
         feedback = interrupt({
             "kind": "review",
             "text": state.get("humanized_post", ""),
+            "first_comment": state.get("first_comment", ""),
             "image": state.get("draft_image_path", ""),
             "hashtags": state.get("draft_hashtags", []),
             "image_mode": state.get("image_mode", "card"),
+            "code_snippet": state.get("code_snippet"),
+            "benchmark_stat": state.get("benchmark_stat"),
             "draft_metadata": state.get("draft_metadata", {}),
             "chosen_story": state.get("chosen_story", {}),
             "ai_detection_score": state.get("ai_detection_score", 0),
@@ -159,6 +169,7 @@ class PipelineOrchestrator:
                 "review_status": "approved",
                 "final_post": state.get("humanized_post", ""),
                 "final_image_path": final_img,
+                "first_comment": state.get("first_comment", ""),
             }
         elif action in ("edit", "edit_requested"):
             return {
@@ -175,11 +186,22 @@ class PipelineOrchestrator:
         return "humanize"
 
     def publish(self, state: PipelineState) -> dict:
-        logger.info("Publishing finalized post to LinkedIn...")
+        logger.info("Publishing finalized post and 1st comment to LinkedIn...")
         final_post = state.get("final_post", "")
         image_path = state.get("final_image_path")
-        post_url = self.publisher_fn(final_post, image_path)
-        return {"linkedin_post_url": post_url}
+        first_comment = state.get("first_comment")
+
+        import inspect
+        sig = inspect.signature(self.publisher_fn)
+        if "first_comment" in sig.parameters:
+            post_url = self.publisher_fn(final_post, image_path, first_comment=first_comment)
+        else:
+            post_url = self.publisher_fn(final_post, image_path)
+
+        from integrations import linkedin
+        comment_status = getattr(linkedin, "LAST_COMMENT_STATUS", None)
+
+        return {"linkedin_post_url": post_url, "linkedin_comment_url": comment_status}
 
     def build_graph(self, checkpointer: Any = None):
         """Constructs and compiles the StateGraph with interrupt checkpointer."""

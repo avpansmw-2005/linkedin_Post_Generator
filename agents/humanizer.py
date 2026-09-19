@@ -43,7 +43,8 @@ CRITICAL ANTI-DETECTION HEURISTICS:
    - Mention concrete technical levers: p99 latency, kernel namespaces, read-only tmpfs, memory footprints, CVEs, eBPF, gVisor vs microVMs.
 5. Formatting & Layout:
    - Short, punchy paragraphs with double line breaks.
-   - Preserve any source URLs and hashtags at the bottom."""
+   - ZERO Outbound Links: NEVER insert external URLs or http/https links in the body. All links belong in the 1st comment.
+   - Preserve the conversation starter question (CTA) and comment pointer ('👇 Check the source in the comments!'), along with hashtags at the bottom."""
 
 
 def rewrite_with_feedback_loop(
@@ -89,7 +90,7 @@ def rewrite_with_feedback_loop(
                 "- MANDATORY ASYMMETRY: Do NOT make every sentence short. Write at least two deep, multi-clause technical sentences (20-28 words) directly adjacent to 2-4 word punchy sentences.\n"
                 "- Eliminate ALL high-school textbook definitions and generic transitions like 'The benefits are straightforward' or 'Of course, there are trade-offs'.\n"
                 "- Frame everything with gritty developer realism and firsthand architectural conviction.\n"
-                "- Keep all technical facts, source links, and hashtags intact."
+                "- ZERO Outbound URLs: Do NOT include raw links or paper URLs in the body. Keep the debate CTA, comment pointer, and hashtags intact."
             )
 
         user_prompt = "\n\n".join(user_instructions)
@@ -102,7 +103,8 @@ def rewrite_with_feedback_loop(
                 schema=HumanizedPost,
                 temperature=temp,
             )
-            candidate_text = result.refined_text.strip()
+            from integrations.linkedin import strip_urls_from_text
+            candidate_text, _ = strip_urls_from_text(result.refined_text.strip())
             score_info = detector.analyze_ai_probability(candidate_text)
             logger.info(
                 "Humanizer Self-Loop Pass %d/%d: Score=%d%% AI (%d%% Human), Burstiness=%.2f, Flagged=%s",
@@ -138,7 +140,7 @@ def rewrite_with_feedback_loop(
                 "1. Break sentence length uniformity aggressively! Place 2-to-3 word sentences ('Zero exceptions.', 'It failed.', 'Don't do it.') immediately before or after 20-word technical sentences.",
                 "2. Remove all textbook definitions and AI transition phrases.",
                 "3. Speak like an experienced staff engineer writing directly from terminal experience.",
-                "4. Retain technical accuracy, links, and hashtags.",
+                "4. Retain technical accuracy, debate question CTA, comment pointer, and hashtags. NO outbound URLs.",
             ]
             critique_feedback = "\n".join(critique_lines)
             current_draft = candidate_text
@@ -178,7 +180,7 @@ def rewrite(
     if edit_notes:
         user_instructions.append(f"User Edit Feedback to Incorporate:\n\"{edit_notes}\"")
     else:
-        user_instructions.append("Instruction: Polish this post into an authentic, human engineering voice. Strip all AI fluff.")
+        user_instructions.append("Instruction: Polish this post into an authentic, human engineering voice. Strip all AI fluff. Keep outbound URLs out of the body.")
 
     user_prompt = "\n\n".join(user_instructions)
 
@@ -190,7 +192,9 @@ def rewrite(
             temperature=0.5,
         )
         logger.info("Post refined: %s", result.summary_of_changes)
-        return result.refined_text
+        from integrations.linkedin import strip_urls_from_text
+        clean_refined, _ = strip_urls_from_text(result.refined_text)
+        return clean_refined
 
     except Exception as e:
         logger.warning("LLM humanizer failed, returning base text with edit notes appended: %s", e)

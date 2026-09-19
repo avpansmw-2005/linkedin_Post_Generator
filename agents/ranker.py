@@ -156,4 +156,5 @@ def rank(items: list[NewsItem], top_k: int = 10, mode: str | None = None) -> lis
                 "category": cat,
                 "reason": f"High-signal {cat.replace('_', ' ')} story from {item.get('source', 'news stream')}.",
             })
+        ranked_fallback.sort(key=lambda x: x["score"], reverse=True)
         return ranked_fallback

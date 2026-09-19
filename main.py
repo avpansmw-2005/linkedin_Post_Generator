@@ -86,10 +86,13 @@ def run_cli_pipeline():
     state2 = app.invoke(Command(resume=chosen), config=config)
 
     print("\n" + "=" * 60)
-    print("GENERATED POST DRAFT:")
+    print("GENERATED POST DRAFT (Zero Outbound Links):")
     print("=" * 60)
     print(state2.get("humanized_post") or state2.get("draft_post"))
     print("=" * 60)
+    if state2.get("first_comment"):
+        print(f"💬 1st Comment (Published with post):\n{state2.get('first_comment')}")
+        print("=" * 60)
     print(f"Generated Card Image: {state2.get('draft_image_path')}\n")
 
     try:
@@ -100,7 +103,17 @@ def run_cli_pipeline():
     if review_choice.lower() == "approve" or not review_choice:
         logger.info("Publishing to LinkedIn...")
         state3 = app.invoke(Command(resume={"action": "approve"}), config=config)
-        print(f"\n🎉 Published Successfully! URL: {state3.get('linkedin_post_url')}\n")
+        print(f"\n🎉 Published Successfully! URL: {state3.get('linkedin_post_url')}")
+        from integrations import linkedin
+        if state3.get("first_comment"):
+            if linkedin.LAST_COMMENT_STATUS == "posted":
+                print(f"💬 1st Comment Published Automatically:\n{state3.get('first_comment')}\n")
+            else:
+                print(
+                    f"⚠️  1st Comment could not be posted automatically (LinkedIn developer tokens lack commenting permission).\n"
+                    f"👉 Copy & drop this 1st comment manually on your post:\n\n"
+                    f"{state3.get('first_comment')}\n"
+                )
     else:
         logger.info("Applying edits: %s", review_choice)
         state3 = app.invoke(Command(resume={"action": "edit", "notes": review_choice}), config=config)
@@ -109,9 +122,22 @@ def run_cli_pipeline():
         print("=" * 60)
         print(state3.get("humanized_post"))
         print("=" * 60)
+        if state3.get("first_comment"):
+            print(f"💬 1st Comment:\n{state3.get('first_comment')}")
+            print("=" * 60)
         # Auto-approve revised
         state4 = app.invoke(Command(resume={"action": "approve"}), config=config)
-        print(f"\n🎉 Published Successfully! URL: {state4.get('linkedin_post_url')}\n")
+        print(f"\n🎉 Published Successfully! URL: {state4.get('linkedin_post_url')}")
+        from integrations import linkedin
+        if state4.get("first_comment"):
+            if linkedin.LAST_COMMENT_STATUS == "posted":
+                print(f"💬 1st Comment Published Automatically:\n{state4.get('first_comment')}\n")
+            else:
+                print(
+                    f"⚠️  1st Comment could not be posted automatically (LinkedIn developer tokens lack commenting permission).\n"
+                    f"👉 Copy & drop this 1st comment manually on your post:\n\n"
+                    f"{state4.get('first_comment')}\n"
+                )
 
 
 async def scheduled_pipeline_trigger(bot):

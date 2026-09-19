@@ -1,4 +1,4 @@
-"""LinkedIn publishing integration via Ayrshare and Cloudinary, with full dry-run support."""
+"""Official LinkedIn REST API publishing integration with full dry-run support."""
 
 from __future__ import annotations
 
@@ -10,62 +10,14 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+# Tracks whether the 1st comment was posted automatically or requires manual drop
+LAST_COMMENT_STATUS: str | None = None
+
 
 def is_dry_run() -> bool:
     """Returns True if the pipeline is operating in dry-run mode."""
     val = os.getenv("DRY_RUN", "true").lower().strip()
     return val in ("true", "1", "yes")
-
-
-def _upload_to_cloudinary(local_path: str) -> str | None:
-    """Uploads an image to Cloudinary and returns the secure public URL."""
-    cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME")
-    api_key = os.getenv("CLOUDINARY_API_KEY")
-    api_secret = os.getenv("CLOUDINARY_API_SECRET")
-
-    if not (cloud_name and api_key and api_secret):
-        logger.info("Cloudinary credentials not configured.")
-        return None
-
-    try:
-        import cloudinary
-        import cloudinary.uploader
-
-        cloudinary.config(
-            cloud_name=cloud_name,
-            api_key=api_key,
-            api_secret=api_secret,
-        )
-        logger.info("Uploading %s to Cloudinary...", local_path)
-        result = cloudinary.uploader.upload(local_path)
-        url = result.get("secure_url") or result.get("url")
-        logger.info("Uploaded successfully: %s", url)
-        return url
-    except Exception as e:
-        logger.warning("Cloudinary upload failed: %s", e)
-        return None
-
-
-def _upload_to_ayrshare_media(local_path: str, ayrshare_key: str) -> str | None:
-    """Uploads local image bytes directly to Ayrshare media endpoint."""
-    try:
-        import httpx
-        url = "https://app.ayrshare.com/api/media/upload"
-        headers = {"Authorization": f"Bearer {ayrshare_key}"}
-
-        filename = os.path.basename(local_path)
-        with open(local_path, "rb") as f:
-            files = {"file": (filename, f, "image/png")}
-            resp = httpx.post(url, headers=headers, files=files, timeout=30.0)
-
-        if resp.status_code in (200, 201):
-            data = resp.json()
-            return data.get("url")
-        else:
-            logger.warning("Ayrshare direct media upload returned %d: %s", resp.status_code, resp.text)
-    except Exception as e:
-        logger.warning("Direct Ayrshare media upload failed: %s", e)
-    return None
 
 
 def to_unicode_bold(text: str) -> str:
@@ -205,8 +157,96 @@ def _upload_linkedin_image_rest(image_path: str, access_token: str, person_urn: 
     raise last_err or RuntimeError("Failed to initialize LinkedIn image upload on all versions.")
 
 
-def _post_official_rest(text: str, image_path: str | None = None) -> str:
-    """Publishes a post directly using the official LinkedIn 202401 /rest/posts API."""
+def strip_urls_from_text(text: str) -> tuple[str, list[str]]:
+    """Removes outbound URLs from the post body to protect LinkedIn feed reach.
+    Returns (cleaned_text, list_of_extracted_urls).
+    """
+    import re
+    urls: list[str] = []
+
+    # 1. Match markdown links [Label](https://...) -> replace with Label
+    def md_repl(match):
+        label = match.group(1)
+        url = match.group(2)
+        urls.append(url)
+        return label
+
+    cleaned = re.sub(r"\[([^\]]+)\]\((https?://[^\s\)]+)\)", md_repl, text)
+
+    # 2. Match raw URLs
+    def raw_repl(match):
+        url = match.group(0)
+        urls.append(url)
+        return ""
+
+    cleaned = re.sub(r"https?://[^\s]+", raw_repl, cleaned)
+
+    # Clean up empty lines or orphan labels like "Source & Paper: " or "Read more: "
+    cleaned = re.sub(r"(?im)^(?:source\s*(?:&|and)?\s*paper|read\s*more|link(?:\s+to\s+the\s+paper)?):\s*$", "", cleaned)
+    # Normalize double linebreaks
+    paragraphs = [p.strip() for p in cleaned.split("\n\n") if p.strip()]
+    return "\n\n".join(paragraphs), urls
+
+
+def _add_linkedin_comment_rest(
+    post_urn: str,
+    comment_text: str,
+    access_token: str,
+    person_urn: str,
+) -> str | None:
+    """Posts the 1st comment on a LinkedIn post via official REST API."""
+    import urllib.parse
+    import httpx
+
+    target_urn = post_urn
+    if not target_urn.startswith("urn:li:"):
+        target_urn = f"urn:li:share:{post_urn}"
+
+    encoded_urn = urllib.parse.quote(target_urn, safe="")
+    url = f"{LINKEDIN_REST_BASE}/socialActions/{encoded_urn}/comments"
+
+    payload = {
+        "actor": person_urn,
+        "object": target_urn,
+        "message": {
+            "text": comment_text,
+        },
+    }
+
+    global LAST_COMMENT_STATUS
+    versions_to_try = [LINKEDIN_API_VERSION] + [v for v in CANDIDATE_VERSIONS if v != LINKEDIN_API_VERSION]
+    with httpx.Client(timeout=15.0) as client:
+        for ver in versions_to_try:
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+                "X-Restli-Protocol-Version": "2.0.0",
+                "LinkedIn-Version": ver,
+            }
+            logger.info("Posting 1st comment to LinkedIn REST API (version %s)...", ver)
+            try:
+                resp = client.post(url, headers=headers, json=payload)
+                if resp.status_code in (200, 201):
+                    comment_urn = resp.headers.get("x-restli-id") or resp.json().get("id") or "created"
+                    logger.info("Successfully posted 1st comment on LinkedIn post %s: %s", target_urn, comment_urn)
+                    LAST_COMMENT_STATUS = "posted"
+                    return comment_urn
+                logger.warning(
+                    "Posting comment failed with version %s (status %d): %s",
+                    ver,
+                    resp.status_code,
+                    resp.text,
+                )
+            except Exception as e:
+                logger.warning("LinkedIn comment request failed with version %s: %s", ver, e)
+
+    LAST_COMMENT_STATUS = "pending_manual"
+    logger.warning("Could not post 1st comment via LinkedIn REST API on any candidate version.")
+    return None
+
+
+def _post_official_rest(text: str, image_path: str | None = None, first_comment: str | None = None) -> str:
+    """Publishes a post directly using the official LinkedIn /rest/posts API and attaches 1st comment."""
     access_token = os.getenv("LINKEDIN_ACCESS_TOKEN", "").strip()
     if not access_token:
         raise RuntimeError("LINKEDIN_ACCESS_TOKEN is not configured in .env.")
@@ -217,13 +257,6 @@ def _post_official_rest(text: str, image_path: str | None = None) -> str:
     image_urn = None
     if image_path and os.path.exists(image_path):
         image_urn = _upload_linkedin_image_rest(image_path, access_token, person_urn)
-
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json",
-        "X-Restli-Protocol-Version": "2.0.0",
-        "LinkedIn-Version": LINKEDIN_API_VERSION,
-    }
 
     payload: dict = {
         "author": person_urn,
@@ -262,6 +295,14 @@ def _post_official_rest(text: str, image_path: str | None = None) -> str:
             if resp.status_code in (200, 201):
                 post_urn = resp.headers.get("x-restli-id") or ""
                 logger.info("Successfully created LinkedIn post via official REST API: %s", post_urn)
+
+                # Post 1st comment immediately after publishing
+                if first_comment and post_urn:
+                    comment_res = _add_linkedin_comment_rest(post_urn, first_comment, access_token, person_urn)
+                    if not comment_res:
+                        global LAST_COMMENT_STATUS
+                        LAST_COMMENT_STATUS = "pending_manual"
+
                 if post_urn:
                     return f"https://www.linkedin.com/feed/update/{post_urn}"
                 return "https://www.linkedin.com/in/me/recent-activity/all/"
@@ -271,15 +312,20 @@ def _post_official_rest(text: str, image_path: str | None = None) -> str:
     raise last_err or RuntimeError("Failed to create LinkedIn post on all API versions.")
 
 
-def post(text: str, image_path: str | None = None) -> str:
-    """Publishes a post to LinkedIn.
+def post(text: str, image_path: str | None = None, first_comment: str | None = None) -> str:
+    """Publishes a post to LinkedIn using official REST API and handles 1st comment.
 
-    Signature: post(text: str, image_path: str | None) -> post_url: str
+    Signature: post(text: str, image_path: str | None, first_comment: str | None) -> post_url: str
     If DRY_RUN=true, logs the action and returns a mock LinkedIn URL.
-    Prefers official LinkedIn REST API (/rest/posts) if LINKEDIN_ACCESS_TOKEN is configured.
-    Otherwise falls back to Ayrshare.
+    Uses the official LinkedIn REST API (/rest/posts) with LINKEDIN_ACCESS_TOKEN.
     """
-    clean_text = format_linkedin_text(text)
+    global LAST_COMMENT_STATUS
+    clean_text, extracted_urls = strip_urls_from_text(format_linkedin_text(text))
+
+    # If first_comment was not explicitly provided but URLs were stripped from body,
+    # turn them into the 1st comment automatically
+    if not first_comment and extracted_urls:
+        first_comment = f"Link to the paper & source 👇\n" + "\n".join(extracted_urls)
 
     if is_dry_run():
         logger.info("[DRY-RUN] Simulating LinkedIn post publication.")
@@ -287,52 +333,17 @@ def post(text: str, image_path: str | None = None) -> str:
         if image_path:
             logger.info("[DRY-RUN] Post attached image: %s", image_path)
         fake_id = "dryrun_" + str(abs(hash(clean_text)))[:10]
-        return f"https://www.linkedin.com/feed/update/urn:li:activity:{fake_id}"
+        post_url = f"https://www.linkedin.com/feed/update/urn:li:activity:{fake_id}"
 
-    # 1. Primary: Official LinkedIn REST API (No third-party branding, no Ayrshare watermark)
-    if os.getenv("LINKEDIN_ACCESS_TOKEN"):
-        logger.info("Using official LinkedIn REST API (/rest/posts) with w_member_social...")
-        return _post_official_rest(clean_text, image_path)
+        if first_comment:
+            logger.info("[DRY-RUN] Simulating 1st comment publication on LinkedIn post: %s", post_url)
+            logger.info("[DRY-RUN] 1st Comment content:\n%s", first_comment)
+            LAST_COMMENT_STATUS = "posted"
 
-    # 2. Fallback: Ayrshare Gateway
-    ayrshare_key = os.getenv("AYRSHARE_API_KEY")
-    if not ayrshare_key:
-        raise RuntimeError("Neither LINKEDIN_ACCESS_TOKEN nor AYRSHARE_API_KEY is set in environment or .env file.")
+        return post_url
 
-    logger.info("LINKEDIN_ACCESS_TOKEN not found; falling back to Ayrshare...")
-    from ayrshare import SocialPost
-    social = SocialPost(ayrshare_key)
+    if not os.getenv("LINKEDIN_ACCESS_TOKEN"):
+        raise RuntimeError("LINKEDIN_ACCESS_TOKEN is not configured in .env.")
 
-    media_urls: list[str] = []
-    if image_path and os.path.exists(image_path):
-        # Try Cloudinary if configured
-        public_url = _upload_to_cloudinary(image_path)
-        if not public_url:
-            public_url = _upload_to_ayrshare_media(image_path, ayrshare_key)
-
-        if public_url:
-            media_urls.append(public_url)
-        else:
-            logger.warning("Proceeding with text-only post as image could not be uploaded.")
-
-    post_payload: dict = {
-        "post": clean_text,
-        "platforms": ["linkedin"],
-    }
-    if media_urls:
-        post_payload["mediaUrls"] = media_urls
-
-    logger.info("Submitting post to Ayrshare for LinkedIn...")
-    result = social.post(post_payload)
-
-    if not isinstance(result, dict) or result.get("status") == "error":
-        raise RuntimeError(f"LinkedIn posting via Ayrshare failed: {result}")
-
-    post_ids = result.get("postIds", [])
-    if post_ids and isinstance(post_ids, list):
-        post_url = post_ids[0].get("postUrl")
-        if post_url:
-            return post_url
-
-    post_id = result.get("id") or "published"
-    return f"https://www.linkedin.com/feed/update/urn:li:activity:{post_id}"
+    logger.info("Using official LinkedIn REST API (/rest/posts) with w_member_social...")
+    return _post_official_rest(clean_text, image_path, first_comment=first_comment)

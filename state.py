@@ -31,8 +31,11 @@ class PipelineState(TypedDict, total=False):
     draft_post: str
     draft_hashtags: list[str]
     draft_metadata: dict
-    image_mode: Literal["card", "ai_visual"]
+    image_mode: Literal["card", "ai_visual", "code"]
     draft_image_path: str
+    code_snippet: str | None
+    benchmark_stat: str | None
+    first_comment: str
     humanized_post: str
     ai_detection_score: int
     review_status: Literal["pending", "approved", "edit_requested"]
@@ -40,6 +43,7 @@ class PipelineState(TypedDict, total=False):
     final_post: str
     final_image_path: str
     linkedin_post_url: str
+    linkedin_comment_url: str | None
 
 
 import sqlite3

@@ -410,14 +410,17 @@ async def _send_review_message(chat_id: int, bot: Any, state: dict) -> None:
     image_path = state.get("draft_image_path")
     image_mode = state.get("image_mode") or "card"
     post_text = state.get("humanized_post") or state.get("draft_post", "")
+    first_comment = state.get("first_comment") or ""
 
     # Send card image if exists
     if image_path and os.path.exists(image_path):
-        caption = (
-            "📊 **Technical Architecture Infographic Card**\n_3 Structured Technical Pillars + Engineering Takeaway_"
-            if image_mode == "card"
-            else "🎨 **16:9 AI Visual Concept**\n_Generated with OpenAI gpt-image-2.5-flare_"
-        )
+        if image_mode == "code":
+            caption = "💻 **Native Code & Architecture Flow Card**\n_Monospace syntax-highlighted block + Benchmark stat_"
+        elif image_mode == "card":
+            caption = "📊 **Technical Architecture Infographic Card**\n_3 Structured Technical Pillars + Engineering Takeaway_"
+        else:
+            caption = "🎨 **16:9 AI Technical Architecture Blueprint**\n_Generated with OpenAI gpt-image-2.5-flare_"
+
         with open(image_path, "rb") as photo:
             await bot.send_photo(
                 chat_id=chat_id,
@@ -441,27 +444,35 @@ async def _send_review_message(chat_id: int, bot: Any, state: dict) -> None:
     keyboard = [
         [
             InlineKeyboardButton("📊 Architecture Card", callback_data="switch_img_card"),
-            InlineKeyboardButton("🎨 AI Visual (GPT-Image)", callback_data="switch_img_ai"),
+            InlineKeyboardButton("💻 Code & Flow Card", callback_data="switch_img_code"),
         ],
         [
+            InlineKeyboardButton("🎨 AI Blueprint", callback_data="switch_img_ai"),
             InlineKeyboardButton("🧬 Make More Human", callback_data="rehumanize_aggressive"),
         ],
         [InlineKeyboardButton("🚀 Approve & Publish", callback_data="review_approve")],
         [InlineKeyboardButton("✍️ Edit Feedback / Polish", callback_data="review_edit_prompt")],
     ]
 
+    comment_section = (
+        f"\n\n💬 **1st Comment (Drops immediately after publishing):**\n"
+        f"```\n{first_comment}\n```"
+        if first_comment else ""
+    )
+
     review_msg = (
-        f"📝 **LinkedIn Post Preview:**\n\n"
+        f"📝 **LinkedIn Post Preview (Zero Outbound Links):**\n\n"
         f"🛡️ **AI Detection:** `{ai_pct}% AI` · `{human_pct}% Human` ({status} {badge})"
         f"{flagged_note}\n\n"
         f"---\n"
-        f"{post_text}\n"
+        f"{post_text}"
+        f"{comment_section}\n"
         f"---\n\n"
         f"👉 **Options:**\n"
+        f"• Tap **Architecture Card**, **Code & Flow Card**, or **AI Blueprint** to toggle image style.\n"
         f"• Tap **🧬 Make More Human** to aggressively rewrite and lower AI detection.\n"
-        f"• Tap **Architecture Card** or **AI Visual** to toggle image style.\n"
-        f"• Tap **Approve & Publish** to post live to LinkedIn.\n"
-        f"• Or simply **type a message reply** here with any edit instructions (e.g. _\"Highlight the microVM boot latency\"_) to regenerate!"
+        f"• Tap **Approve & Publish** to post live to LinkedIn + auto-post 1st comment.\n"
+        f"• Or simply **type a message reply** here with any edit instructions (e.g. _\"Highlight the cache hit ratio\"_) to regenerate!"
     )
     await bot.send_message(
         chat_id=chat_id,
@@ -494,17 +505,26 @@ async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYP
     config = session["config"]
     loop = asyncio.get_running_loop()
 
-    if action in ("switch_img_card", "switch_img_ai"):
-        target_mode = "card" if action == "switch_img_card" else "ai_visual"
+    if action in ("switch_img_card", "switch_img_code", "switch_img_ai"):
+        if action == "switch_img_card":
+            target_mode = "card"
+            mode_label = "Architecture Card"
+        elif action == "switch_img_code":
+            target_mode = "code"
+            mode_label = "Code & Flow Card"
+        else:
+            target_mode = "ai_visual"
+            mode_label = "AI Architecture Blueprint"
+
         current_state = app.get_state(config).values
         if current_state.get("image_mode") == target_mode and os.path.exists(current_state.get("draft_image_path", "")):
-            await query.message.reply_text(f"ℹ️ The **{target_mode.upper()}** style is already active.", parse_mode="Markdown")
+            await query.message.reply_text(f"ℹ️ The **{mode_label}** style is already active.", parse_mode="Markdown")
             return
 
         status_msg = (
-            "⏳ *Rendering Technical Architecture Card...*"
-            if target_mode == "card"
-            else "⏳ *Generating 16:9 AI Visual using OpenAI gpt-image-2.5-flare (this takes ~4-6s)...*"
+            f"⏳ *Generating {mode_label}...*"
+            if target_mode != "ai_visual"
+            else "⏳ *Generating 16:9 AI Blueprint using OpenAI gpt-image-2.5-flare (takes ~4-6s)...*"
         )
         await query.message.reply_text(status_msg, parse_mode="Markdown")
 
@@ -526,7 +546,7 @@ async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYP
             await _send_review_message(chat_id, context.bot, updated_state)
         except Exception as e:
             logger.error("Failed switching image style: %s", e, exc_info=True)
-            await query.message.reply_text(f"❌ Failed to generate {target_mode} image: `{e}`")
+            await query.message.reply_text(f"❌ Failed to generate {mode_label}: `{e}`")
 
     elif action == "review_approve":
         await query.edit_message_reply_markup(reply_markup=None)
@@ -547,11 +567,24 @@ async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYP
 
         final_state = app.get_state(config).values
         post_url = final_state.get("linkedin_post_url", "")
+        first_comment = final_state.get("first_comment", "")
         from integrations import linkedin
+        if first_comment:
+            if linkedin.LAST_COMMENT_STATUS == "posted":
+                comment_info = "\n\n💬 <b>1st comment published automatically!</b>"
+            else:
+                comment_info = (
+                    f"\n\n👇 <b>1st Comment to drop on your post (tap to copy):</b>\n"
+                    f"<code>{first_comment}</code>\n\n"
+                    f"<i>(Dropped manually in 1-tap to keep 100% direct official posting with zero watermarks)</i>"
+                )
+        else:
+            comment_info = ""
+
         if linkedin.is_dry_run():
             success_text = (
                 f"🧪 <b>[DRY-RUN] Simulation Succeeded!</b>\n\n"
-                f"Your post and visual were processed and simulated safely without touching your live LinkedIn profile.\n\n"
+                f"Your post, visual card, and 1st comment were simulated safely without touching your live LinkedIn profile.{comment_info}\n\n"
                 f"👉 <i>The link ending in <code>dryrun_...</code> is a simulated mock URL.</i>\n\n"
                 f"🚀 <b>To publish to your REAL LinkedIn account:</b>\n"
                 f"1. Change <code>DRY_RUN=false</code> in <code>.env</code>\n"
@@ -560,7 +593,7 @@ async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYP
         else:
             success_text = (
                 f"🎉 <b>Live Post Successfully Published to LinkedIn!</b>\n\n"
-                f"🔗 <b>LinkedIn URL:</b>\n{post_url}"
+                f"🔗 <b>LinkedIn URL:</b>\n{post_url}{comment_info}"
             )
         try:
             await query.message.reply_text(success_text, parse_mode="HTML")
