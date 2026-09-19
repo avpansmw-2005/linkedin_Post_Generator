@@ -160,8 +160,9 @@ The core pipeline is compiled as a stateful `StateGraph` in [`orchestrator.py`](
 ```python
 class PipelineState(TypedDict):
     run_date: str                        # Execution timestamp (ISO 8601)
-    raw_news: list[dict]                 # Aggregated raw feed items
-    ranked_top5: list[dict]              # Top 5 scored stories with rationale
+    raw_items: list[dict]                # Aggregated raw feed items
+    ranked_top10: list[dict]             # Top 10 scored stories with rationale
+    ranked_options: list[dict]           # Candidate options presented at interrupt gate
     chosen_story: dict | None            # User-selected technical story
     draft_post: str | None               # Base technical draft
     humanized_post: str | None           # Refined post text (zero links)
@@ -339,8 +340,8 @@ Asynchronous Telegram bot powered by `python-telegram-bot`:
 │    • Manual trigger via /scan command                       │
 │                                                             │
 │ 2. Story Selection Card:                                    │
-│    • Sends Top 5 ranked stories with reasoning              │
-│    • Inline keyboard: [ 1 ] [ 2 ] [ 3 ] [ 4 ] [ 5 ]         │
+│    • Sends Top 10 ranked stories with reasoning             │
+│    • Inline keyboard: [ 1 ] [ 2 ] ... [ 10 ]                │
 │                                                             │
 │ 3. Review Card Message:                                     │
 │    • Visual card photo uploaded directly                    │
@@ -522,8 +523,8 @@ Executes a single end-to-end pass inside your terminal without starting the Tele
 python main.py --run-once
 ```
 
-1. Scans feeds and displays top 5 ranked stories.
-2. Prompts you to pick story #1–5.
+1. Scans feeds and displays top 10 ranked stories.
+2. Prompts you to pick story #1–10 (or filter via `--topic` / `--mode`).
 3. Generates draft, card, and humanized post.
 4. Prompts you to approve or input revision notes before publishing.
 

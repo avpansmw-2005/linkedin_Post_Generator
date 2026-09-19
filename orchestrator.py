@@ -88,11 +88,11 @@ class PipelineOrchestrator:
             ranked = self.ranker_fn(raw_items, **kwargs)
         except Exception:
             ranked = self.ranker_fn(raw_items)
-        return {"ranked_top5": ranked, "ranked_options": ranked}
+        return {"ranked_top10": ranked, "ranked_options": ranked, "ranked_top5": ranked}
 
     def await_story_choice(self, state: PipelineState) -> dict:
         logger.info("Pausing for user story selection (interrupt 1)...")
-        options = state.get("ranked_options") or state.get("ranked_top5", [])
+        options = state.get("ranked_options") or state.get("ranked_top10") or state.get("ranked_top5", [])
         choice = interrupt({
             "kind": "story_choice",
             "options": options,

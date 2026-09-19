@@ -1,4 +1,4 @@
-"""Ranker agent scoring news items and picking the top 5 with reasons."""
+"""Ranker agent scoring news items and picking the top 10 with reasons."""
 
 from __future__ import annotations
 

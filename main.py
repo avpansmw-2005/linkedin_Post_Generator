@@ -42,28 +42,47 @@ def parse_args():
         action="store_true",
         help="Force DRY_RUN=true for testing without live LinkedIn publishing.",
     )
+    parser.add_argument(
+        "--topic",
+        type=str,
+        default=None,
+        help="Specific topic to search for (e.g. --topic 'MCP' or --topic 'PostgreSQL').",
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["all", "learning", "mistakes", "news"],
+        default=None,
+        help="Filter mode: 'learning', 'mistakes', 'news', or 'all'.",
+    )
     return parser.parse_args()
 
 
-def run_cli_pipeline():
+def run_cli_pipeline(topic: str | None = None, mode: str | None = None):
     """Runs a demonstration pipeline pass in the terminal."""
-    logger.info("Executing pipeline in CLI mode...")
+    logger.info("Executing pipeline in CLI mode (topic=%s, mode=%s)...", topic, mode)
     app = create_pipeline()
     thread_id = f"cli_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
     config = {"configurable": {"thread_id": thread_id}}
 
     logger.info("Step 1: Fetching & Ranking...")
-    state = app.invoke({"run_date": datetime.now(timezone.utc).isoformat()}, config=config)
+    input_payload = {"run_date": datetime.now(timezone.utc).isoformat()}
+    if topic:
+        input_payload["topic"] = topic
+    if mode:
+        input_payload["mode"] = mode
+    state = app.invoke(input_payload, config=config)
 
-    top5 = state.get("ranked_top5", [])
-    if not top5:
+    ranked_stories = state.get("ranked_options") or state.get("ranked_top10") or state.get("ranked_top5", [])
+    if not ranked_stories:
         logger.warning("No news stories returned.")
         return
 
+    count = len(ranked_stories)
     print("\n" + "=" * 60)
-    print("TOP 5 RANKED AI STORIES:")
+    print(f"TOP {count} RANKED AI STORIES:")
     print("=" * 60)
-    for idx, story in enumerate(top5, start=1):
+    for idx, story in enumerate(ranked_stories, start=1):
         print(f"\n[{idx}] {story.get('title')}")
         print(f"    Source: {story.get('source')} | Score: {story.get('score')}")
         print(f"    Reason: {story.get('reason')}")
@@ -71,13 +90,13 @@ def run_cli_pipeline():
 
     # In CLI mode, prompt terminal user to pick
     try:
-        user_input = input("Select a story number (1-5) or press Enter for #1: ").strip()
+        user_input = input(f"Select a story number (1-{count}) or press Enter for #1: ").strip()
         idx = int(user_input) - 1 if user_input.isdigit() else 0
-        idx = max(0, min(idx, len(top5) - 1))
+        idx = max(0, min(idx, count - 1))
     except (EOFError, KeyboardInterrupt):
         idx = 0
 
-    chosen = top5[idx]
+    chosen = ranked_stories[idx]
     logger.info("Selected: %s", chosen.get("title"))
 
     from langgraph.types import Command
@@ -156,7 +175,7 @@ def main():
         os.environ["DRY_RUN"] = "true"
 
     if args.run_once:
-        run_cli_pipeline()
+        run_cli_pipeline(topic=args.topic, mode=args.mode)
         return
 
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
