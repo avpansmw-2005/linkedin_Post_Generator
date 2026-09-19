@@ -502,7 +502,8 @@ def generate_ai_visual(
         raise ValueError("OPENAI_API_KEY not configured in environment.")
 
     from openai import OpenAI
-    client = OpenAI(api_key=api_key, timeout=15.0)
+    timeout = float(os.getenv("OPENAI_IMAGE_TIMEOUT", "60.0"))
+    client = OpenAI(api_key=api_key, timeout=timeout)
 
     # Candidate models in order of capability (latest gpt-image series)
     candidate_models = [

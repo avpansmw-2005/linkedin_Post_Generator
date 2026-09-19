@@ -353,7 +353,10 @@ async def handle_story_selection(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     if not query or not query.data:
         return
-    await query.answer()
+    try:
+        await query.answer()
+    except Exception as e:
+        logger.debug("Callback query answer failed or expired: %s", e)
 
     user_id = update.effective_user.id if update.effective_user else 0
     if not is_authorized(user_id):
@@ -486,7 +489,10 @@ async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     if not query or not query.data:
         return
-    await query.answer()
+    try:
+        await query.answer()
+    except Exception as e:
+        logger.debug("Callback query answer failed or expired: %s", e)
 
     chat_id = update.effective_chat.id if update.effective_chat else 0
     user_id = update.effective_user.id if update.effective_user else 0
