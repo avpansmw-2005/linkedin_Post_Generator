@@ -253,19 +253,22 @@ sequenceDiagram
 
         <!-- agents/fetcher.py & ranker.py -->
         <div class="grid-2">
+        <!-- agents/fetcher.py & ranker.py -->
+        <div class="grid-2">
           <div class="glass-card">
             <div class="card-header">
               <h3 class="card-title">3. <code>agents/fetcher.py</code></h3>
-              <span class="card-badge">Real-Time Ingestion</span>
+              <span class="card-badge">Google Search & Multi-Feed Scout</span>
             </div>
             <p style="color: var(--text-muted); font-size: 14px;">
-              Multi-source ingestion engine fetching from:
+              Multi-source ingestion engine querying:
             </p>
             <ul style="padding-left: 20px; color: var(--text-muted); font-size: 13.5px; margin: 10px 0;">
+              <li><strong>Google News & Search:</strong> Real-time articles from premier publications (Forbes, Tom's Hardware, VentureBeat, TechCrunch, The Register, The New Stack).</li>
               <li><strong>Hacker News Algolia:</strong> <code>/api/v1/search_by_date</code> with <code>numericFilters=created_at_i>{cutoff}</code>.</li>
-              <li><strong>Curated RSS:</strong> Simon Willison, Hugging Face Blog, Cloudflare Eng, GitHub Eng.</li>
-              <li><strong>arXiv API:</strong> Latest computer science papers sorted by submission date.</li>
-              <li><strong>Deduplication SQLite Ledger:</strong> Computes SHA-256 hash of URLs so users never see repeat articles.</li>
+              <li><strong>Curated Engineering Blogs:</strong> InfoQ, The New Stack, TechCrunch AI, Ars Technica, Simon Willison, Hugging Face, Cloudflare Eng.</li>
+              <li><strong>arXiv API & Dev.to:</strong> Latest computer science papers & hands-on developer guides.</li>
+              <li><strong>Deduplication SQLite Ledger:</strong> SHA-256 URL hash ledger preventing repeat stories.</li>
             </ul>
           </div>
 
@@ -280,8 +283,8 @@ sequenceDiagram
             <ul style="padding-left: 20px; color: var(--text-muted); font-size: 13.5px; margin: 10px 0;">
               <li>🎓 <strong>AI Developer Learning (4-5 items):</strong> System design, local LLMs, MCP, RAG. (Scores 9.0–10.0).</li>
               <li>⚠️ <strong>Developer Mistakes (3-4 items):</strong> Postmortems, anti-patterns, debugging traps. (Scores 8.0–8.9).</li>
-              <li>🚀 <strong>Latest Tech News (2-3 items):</strong> Model breakthroughs. (Scores 7.0–7.9).</li>
-              <li><strong>Entity Diversity:</strong> Rejects clustering multiple stories on the exact same model or framework.</li>
+              <li>🚀 <strong>Latest Tech News (2-3 items):</strong> Model breakthroughs & quantifiable benchmarks. (Scores 7.0–7.9).</li>
+              <li>💡 <strong>Audience Resonance:</strong> Prioritizes what practitioners actually want to know (trade-offs, gotchas, speedups).</li>
             </ul>
           </div>
         </div>
@@ -291,7 +294,7 @@ sequenceDiagram
           <div class="glass-card">
             <div class="card-header">
               <h3 class="card-title">5. <code>agents/writer.py</code></h3>
-              <span class="card-badge">Copywriting Engine</span>
+              <span class="card-badge">Copywriting & Humor Engine</span>
             </div>
             <p style="color: var(--text-muted); font-size: 13.5px;">
               Generates structured post schemas tailored to category archetypes:
@@ -302,7 +305,7 @@ sequenceDiagram
               <span class="chip amber">Production Fix</span>
             </div>
             <p style="color: var(--text-muted); font-size: 13px;">
-              Also generates 3 technical pillars for the card and a cinematic 16:9 prompt for OpenAI image generation.
+              Includes <strong>🎭 Humor Mode</strong> injecting cynical developer satire, witty analogies, and relatable engineering comedy.
             </p>
           </div>
 
@@ -324,15 +327,15 @@ sequenceDiagram
           <div class="glass-card">
             <div class="card-header">
               <h3 class="card-title">7. <code>agents/humanizer.py</code></h3>
-              <span class="card-badge">Reflexion Critic</span>
+              <span class="card-badge">Reflexion Critic & Constraint Gate</span>
             </div>
             <p style="color: var(--text-muted); font-size: 13.5px;">
-              Implements <code>rewrite_with_feedback_loop</code>:
+              Anti-AI engine with <strong>Executive Directive Supremacy</strong>:
             </p>
             <ul style="padding-left: 18px; color: var(--text-muted); font-size: 13px; margin: 8px 0;">
-              <li>Up to 3 targeted revision passes.</li>
-              <li>Injects explicit detector critique into next prompt.</li>
-              <li>Forces rhythmic asymmetry: 2-word blunt sentences paired with 25-word technical explanations.</li>
+              <li><strong>Deterministic Constraint Gate:</strong> 100% compliance with user edit commands (e.g. eliminating all hyphens, dashes, hashtags, emojis).</li>
+              <li><strong>Reflexion Loop:</strong> Iterative anti-detection self-correction passes.</li>
+              <li><strong>Asymmetric Burstiness:</strong> 2-word blunt sentences paired with 25-word technical explanations.</li>
               <li>Achieves &lt;20% AI score (Likely Human ✅).</li>
             </ul>
           </div>

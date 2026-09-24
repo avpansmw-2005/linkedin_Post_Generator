@@ -105,7 +105,17 @@ class PipelineOrchestrator:
         if not chosen:
             raise ValueError("No story chosen before generate_draft!")
 
-        draft = self.writer_fn(chosen)
+        humor_mode = bool(state.get("humor_mode", False))
+        import inspect
+        try:
+            sig = inspect.signature(self.writer_fn)
+            if "humor" in sig.parameters:
+                draft = self.writer_fn(chosen, humor=humor_mode)
+            else:
+                draft = self.writer_fn(chosen)
+        except Exception:
+            draft = self.writer_fn(chosen)
+
         image_mode = state.get("image_mode") or "card"
         try:
             image_path = self.imagegen_fn(chosen, draft, mode=image_mode)
@@ -125,6 +135,7 @@ class PipelineOrchestrator:
             "code_snippet": draft.get("code_snippet"),
             "benchmark_stat": draft.get("benchmark_stat"),
             "first_comment": first_comment,
+            "humor_mode": humor_mode,
         }
 
     def humanize(self, state: PipelineState) -> dict:
@@ -132,8 +143,18 @@ class PipelineOrchestrator:
         edit_notes = state.get("user_edit_notes")
         base_text = state.get("humanized_post") or state.get("draft_post", "")
         chosen = state.get("chosen_story")
+        humor_mode = bool(state.get("humor_mode", False))
 
-        rewritten = self.humanizer_fn(base_text, edit_notes, chosen)
+        import inspect
+        try:
+            sig = inspect.signature(self.humanizer_fn)
+            kwargs = {}
+            if "humor" in sig.parameters:
+                kwargs["humor"] = humor_mode
+            rewritten = self.humanizer_fn(base_text, edit_notes, chosen, **kwargs)
+        except Exception:
+            rewritten = self.humanizer_fn(base_text, edit_notes, chosen)
+
         from agents import detector
         score_info = detector.analyze_ai_probability(rewritten)
 
@@ -141,6 +162,7 @@ class PipelineOrchestrator:
             "humanized_post": rewritten,
             "user_edit_notes": None,
             "ai_detection_score": score_info["ai_score"],
+            "humor_mode": humor_mode,
         }
 
     def await_review(self, state: PipelineState) -> dict:
@@ -157,6 +179,7 @@ class PipelineOrchestrator:
             "draft_metadata": state.get("draft_metadata", {}),
             "chosen_story": state.get("chosen_story", {}),
             "ai_detection_score": state.get("ai_detection_score", 0),
+            "humor_mode": state.get("humor_mode", False),
         })
 
         if not isinstance(feedback, dict):
@@ -171,10 +194,19 @@ class PipelineOrchestrator:
                 "final_image_path": final_img,
                 "first_comment": state.get("first_comment", ""),
             }
-        elif action in ("edit", "edit_requested"):
+        elif action in ("humor", "add_humor"):
             return {
                 "review_status": "edit_requested",
-                "user_edit_notes": feedback.get("notes", ""),
+                "humor_mode": True,
+                "user_edit_notes": "Add humor: Inject witty developer satire, cynical engineering humor, and hilarious tech realities into this post.",
+            }
+        elif action in ("edit", "edit_requested"):
+            notes = feedback.get("notes", "")
+            humor_requested = any(w in notes.lower() for w in ["humor", "funny", "wit", "witty", "joke", "satire"])
+            return {
+                "review_status": "edit_requested",
+                "user_edit_notes": notes,
+                "humor_mode": state.get("humor_mode", False) or humor_requested,
             }
         else:
             raise ValueError(f"Unknown review action: {action}")

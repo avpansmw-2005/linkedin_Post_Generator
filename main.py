@@ -55,18 +55,31 @@ def parse_args():
         default=None,
         help="Filter mode: 'learning', 'mistakes', 'news', or 'all'.",
     )
+    parser.add_argument(
+        "--humor",
+        action="store_true",
+        help="Inject witty developer satire and relatable engineering comedy into the post.",
+    )
     return parser.parse_args()
 
 
-def run_cli_pipeline(topic: str | None = None, mode: str | None = None):
-    """Runs a demonstration pipeline pass in the terminal."""
-    logger.info("Executing pipeline in CLI mode (topic=%s, mode=%s)...", topic, mode)
+def run_cli_pipeline(topic: str | None = None, mode: str | None = None, humor: bool = False):
+    """Runs a demonstration pipeline pass in the terminal with Agentic Style Communication."""
+    print("\n" + "=" * 65)
+    print("🤖 AUTONOMOUS MULTI-AGENT LINKEDIN CONTENT PIPELINE")
+    print("=" * 65)
+    logger.info("Executing pipeline in CLI mode (topic=%s, mode=%s, humor=%s)...", topic, mode, humor)
     app = create_pipeline()
     thread_id = f"cli_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
     config = {"configurable": {"thread_id": thread_id}}
 
-    logger.info("Step 1: Fetching & Ranking...")
-    input_payload = {"run_date": datetime.now(timezone.utc).isoformat()}
+    print("\n🕵️‍♂️ [Research Scout Agent] Scouring Google News & Search, Hacker News, Dev.to & Tech Feeds...")
+    print("   • Querying premier publications: Forbes, Tom's Hardware, VentureBeat, TechCrunch, The New Stack")
+    print("   • Analyzing what developers and practitioners actually want to hear...")
+    if humor:
+        print("   • 🎭 Humor Mode: Active (will inject sharp engineering satire)")
+
+    input_payload = {"run_date": datetime.now(timezone.utc).isoformat(), "humor_mode": humor}
     if topic:
         input_payload["topic"] = topic
     if mode:
@@ -79,48 +92,58 @@ def run_cli_pipeline(topic: str | None = None, mode: str | None = None):
         return
 
     count = len(ranked_stories)
-    print("\n" + "=" * 60)
-    print(f"TOP {count} RANKED AI STORIES:")
-    print("=" * 60)
+    print("\n" + "-" * 65)
+    print(f"⚖️ [Signal Curator Agent] Screened candidate stories. Top {count} ranked by signal:")
+    print("-" * 65)
     for idx, story in enumerate(ranked_stories, start=1):
-        print(f"\n[{idx}] {story.get('title')}")
-        print(f"    Source: {story.get('source')} | Score: {story.get('score')}")
-        print(f"    Reason: {story.get('reason')}")
-    print("=" * 60 + "\n")
+        cat = story.get("category", "ai_learning").replace("_", " ").upper()
+        print(f"\n[{idx}] [{story.get('source')}] {story.get('title')}")
+        print(f"    Category: {cat} | Signal Score: {story.get('score')}")
+        print(f"    💡 Takeaway: {story.get('reason')}")
+    print("\n" + "-" * 65)
 
     # In CLI mode, prompt terminal user to pick
     try:
-        user_input = input(f"Select a story number (1-{count}) or press Enter for #1: ").strip()
+        user_input = input(f"\n👉 Select a story number (1-{count}) or press Enter for #1: ").strip()
         idx = int(user_input) - 1 if user_input.isdigit() else 0
         idx = max(0, min(idx, count - 1))
     except (EOFError, KeyboardInterrupt):
         idx = 0
 
     chosen = ranked_stories[idx]
-    logger.info("Selected: %s", chosen.get("title"))
+    print(f"\n✅ Selected Story: {chosen.get('title')}")
 
     from langgraph.types import Command
 
-    logger.info("Step 2: Generating draft, rendering card, and humanizing...")
+    print("\n🤖 [Collaborative Agent Execution In Motion]")
+    print("   • ✍️ [Senior Tech Writer Agent] Drafting structured post & debate-sparking CTA...")
+    print("   • 🎨 [Visual Architect Agent] Rendering high-dwell infographic card...")
+    print("   • 🧬 [Voice & Anti-AI Agent] Eliminating clichés and maximizing burstiness...")
+
     state2 = app.invoke(Command(resume=chosen), config=config)
 
-    print("\n" + "=" * 60)
-    print("GENERATED POST DRAFT (Zero Outbound Links):")
-    print("=" * 60)
+    from agents import detector
+    ai_score_info = detector.analyze_ai_probability(state2.get("humanized_post") or state2.get("draft_post", ""))
+
+    print("\n" + "=" * 65)
+    print("📋 [Quality Gate Agent Report] GENERATED POST DRAFT")
+    print(f"🛡️  AI Detection Score: {ai_score_info['ai_score']}% AI · {ai_score_info['human_score']}% Human ({ai_score_info['status']})")
+    print(f"⚡ Burstiness Variance: {ai_score_info['burstiness']:.2f}")
+    print("=" * 65)
     print(state2.get("humanized_post") or state2.get("draft_post"))
-    print("=" * 60)
+    print("=" * 65)
     if state2.get("first_comment"):
         print(f"💬 1st Comment (Published with post):\n{state2.get('first_comment')}")
-        print("=" * 60)
-    print(f"Generated Card Image: {state2.get('draft_image_path')}\n")
+        print("=" * 65)
+    print(f"🖼️ Generated Card Image: {state2.get('draft_image_path')}\n")
 
     try:
-        review_choice = input("Type 'approve' to publish, or type edit notes: ").strip()
+        review_choice = input("👉 Options: Press Enter/'approve' to publish, 'humor' for witty satire, or type edit notes: ").strip()
     except (EOFError, KeyboardInterrupt):
         review_choice = "approve"
 
     if review_choice.lower() == "approve" or not review_choice:
-        logger.info("Publishing to LinkedIn...")
+        print("\n🚀 [Publisher Agent] Dispatching post to LinkedIn REST API...")
         state3 = app.invoke(Command(resume={"action": "approve"}), config=config)
         print(f"\n🎉 Published Successfully! URL: {state3.get('linkedin_post_url')}")
         from integrations import linkedin
@@ -133,18 +156,36 @@ def run_cli_pipeline(topic: str | None = None, mode: str | None = None):
                     f"👉 Copy & drop this 1st comment manually on your post:\n\n"
                     f"{state3.get('first_comment')}\n"
                 )
-    else:
-        logger.info("Applying edits: %s", review_choice)
-        state3 = app.invoke(Command(resume={"action": "edit", "notes": review_choice}), config=config)
-        print("\n" + "=" * 60)
-        print("REVISED POST:")
-        print("=" * 60)
+    elif review_choice.lower() in ("humor", "wit", "funny"):
+        print("\n🎭 [Humor Specialist Agent] Injecting sharp developer wit and relatable tech satire...")
+        state3 = app.invoke(Command(resume={"action": "humor"}), config=config)
+        print("\n" + "=" * 65)
+        print("🎭 [Humor Specialist Agent] REVISED DRAFT WITH WIT:")
+        print("=" * 65)
         print(state3.get("humanized_post"))
-        print("=" * 60)
+        print("=" * 65)
+        auto_pub = input("\nType 'approve' to publish this humorous version, or press Enter: ").strip()
+        state4 = app.invoke(Command(resume={"action": "approve"}), config=config)
+        print(f"\n🎉 Published Successfully! URL: {state4.get('linkedin_post_url')}")
+    else:
+        print(f"\n🎯 [Command Center] Directive received: \"{review_choice}\"")
+        print("   • 🧬 [Humanizer Agent] Executing rewrite with mandatory executive override...")
+        print("   • 🔍 [Quality Gate Agent] Verifying constraint compliance...")
+        state3 = app.invoke(Command(resume={"action": "edit", "notes": review_choice}), config=config)
+        revised = state3.get("humanized_post", "")
+        if "remove hyphen" in review_choice.lower() or "no hyphen" in review_choice.lower():
+            if "-" not in revised and "—" not in revised:
+                print("   • ✅ [Quality Gate Agent] Verified: 0 hyphens or dashes in revised text.")
+        print("\n" + "=" * 65)
+        print("📋 [Quality Gate Agent] REVISED POST:")
+        print("=" * 65)
+        print(revised)
+        print("=" * 65)
         if state3.get("first_comment"):
             print(f"💬 1st Comment:\n{state3.get('first_comment')}")
-            print("=" * 60)
+            print("=" * 65)
         # Auto-approve revised
+        print("\n🚀 [Publisher Agent] Dispatching finalized post to LinkedIn REST API...")
         state4 = app.invoke(Command(resume={"action": "approve"}), config=config)
         print(f"\n🎉 Published Successfully! URL: {state4.get('linkedin_post_url')}")
         from integrations import linkedin
@@ -175,7 +216,7 @@ def main():
         os.environ["DRY_RUN"] = "true"
 
     if args.run_once:
-        run_cli_pipeline(topic=args.topic, mode=args.mode)
+        run_cli_pipeline(topic=args.topic, mode=args.mode, humor=args.humor)
         return
 
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")

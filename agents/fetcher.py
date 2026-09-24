@@ -13,6 +13,8 @@ from __future__ import annotations
 import os
 import re
 import time
+import html
+import urllib.parse
 import hashlib
 import sqlite3
 import logging
@@ -249,6 +251,118 @@ def _classify_story(title: str, summary: str = "") -> str:
     if words.intersection(AI_LEARNING_KEYWORDS) or any(a in combined for a in ["how to", "tutorial", "architecture", "deep dive", "guide", "system design"]):
         return CATEGORY_AI_LEARNING
     return CATEGORY_LATEST_NEWS
+
+
+# ==============================================================================
+# Google News & Search Real-Time Aggregator (Expanded Premier Sources)
+# ==============================================================================
+
+def fetch_google_news_search(
+    query: str,
+    default_category: str = CATEGORY_AI_LEARNING,
+    max_items: int = 20,
+    max_days: int = 14,
+) -> list[NewsItem]:
+    """Searches Google News RSS for real-time publications (Forbes, Tom's Hardware,
+    VentureBeat, TechCrunch, The Register, KDnuggets, The New Stack, etc.)
+    and unpacks multi-story cluster items for maximum source diversity.
+    """
+    items: list[NewsItem] = []
+    try:
+        encoded_query = urllib.parse.quote(query)
+        url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        with httpx.Client(timeout=DEFAULT_TIMEOUT) as client:
+            resp = client.get(url, headers=headers)
+            if resp.status_code != 200:
+                logger.warning("Google News search returned status %d for query '%s'", resp.status_code, query)
+                return []
+            parsed = feedparser.parse(resp.text)
+            sub_pattern = re.compile(r'<a href="([^"]+)"[^>]*>([^<]+)</a>(?:&nbsp;|\s)+<font[^>]*>([^<]+)</font>')
+
+            seen_titles = set()
+            for entry in parsed.entries[:max_items]:
+                pub_raw = getattr(entry, "published", "")
+                pub_parsed = getattr(entry, "published_parsed", None)
+                if not is_recent(pub_parsed or pub_raw, max_days=max_days):
+                    continue
+
+                summary_html = getattr(entry, "summary", "")
+                sub_articles = sub_pattern.findall(summary_html)
+
+                if sub_articles:
+                    for s_link, s_title, s_src in sub_articles:
+                        clean_title = html.unescape(s_title.strip())
+                        clean_src = html.unescape(s_src.strip())
+                        if not clean_title or clean_title.lower() in seen_titles:
+                            continue
+                        seen_titles.add(clean_title.lower())
+                        cat = _classify_story(clean_title) or default_category
+                        items.append({
+                            "title": clean_title,
+                            "url": s_link.strip(),
+                            "source": clean_src,
+                            "summary": f"Discussion and reporting via {clean_src}: {clean_title}.",
+                            "published": pub_raw,
+                            "category": cat,
+                            "relative_time": get_relative_time_str(pub_parsed or pub_raw),
+                        })
+                else:
+                    main_title = html.unescape(getattr(entry, "title", "").strip())
+                    main_link = getattr(entry, "link", "").strip()
+                    main_source = html.unescape(getattr(entry, "source", {}).get("title", "Google News").strip())
+                    if not main_title or main_title.lower() in seen_titles:
+                        continue
+                    seen_titles.add(main_title.lower())
+                    cat = _classify_story(main_title) or default_category
+                    items.append({
+                        "title": main_title,
+                        "url": main_link,
+                        "source": main_source,
+                        "summary": f"Reporting on {main_title} via {main_source}.",
+                        "published": pub_raw,
+                        "category": cat,
+                        "relative_time": get_relative_time_str(pub_parsed or pub_raw),
+                    })
+    except Exception as e:
+        logger.warning("Google News search failed for '%s': %s", query, e)
+
+    return items
+
+
+def fetch_google_tech_headlines(max_items: int = 15, max_days: int = 5) -> list[NewsItem]:
+    """Fetches trending global technology and developer breakthroughs from Google News."""
+    items: list[NewsItem] = []
+    try:
+        url = "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=en-US&gl=US&ceid=US:en"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        with httpx.Client(timeout=DEFAULT_TIMEOUT) as client:
+            resp = client.get(url, headers=headers)
+            if resp.status_code == 200:
+                parsed = feedparser.parse(resp.text)
+                for entry in parsed.entries[:max_items]:
+                    pub_raw = getattr(entry, "published", "")
+                    pub_parsed = getattr(entry, "published_parsed", None)
+                    if not is_recent(pub_parsed or pub_raw, max_days=max_days):
+                        continue
+                    title = html.unescape(getattr(entry, "title", "").strip())
+                    link = getattr(entry, "link", "").strip()
+                    src = html.unescape(getattr(entry, "source", {}).get("title", "Google Tech").strip())
+                    if title and _is_relevant_developer_story(title):
+                        cat = _classify_story(title)
+                        items.append({
+                            "title": title,
+                            "url": link,
+                            "source": src,
+                            "summary": f"Global tech headline from {src}: {title}.",
+                            "published": pub_raw,
+                            "category": cat,
+                            "relative_time": get_relative_time_str(pub_parsed or pub_raw),
+                        })
+    except Exception as e:
+        logger.warning("Google Tech Headlines fetch failed: %s", e)
+
+    return items
 
 
 # ==============================================================================
@@ -494,7 +608,9 @@ def _extract_search_keywords(topic: str) -> str:
 
 def fetch_by_topic(topic: str, mode: str | None = None, limit: int = 40) -> list[NewsItem]:
     """Fetches high-signal developer articles and discussions matching a specific topic.
-    Guarantees recent results via search_by_date and prioritizes AI Learning and Dev Mistakes.
+    Combines Google News/Search across premier publications (Forbes, Tom's Hardware, VentureBeat, TechCrunch),
+    Hacker News, arXiv, and curated tech blogs.
+    Directly extracts what people want to hear: benchmarks, debates, pitfalls, and practical architecture.
     """
     clean_topic = topic.strip()
     search_query = _extract_search_keywords(clean_topic)
@@ -504,18 +620,33 @@ def fetch_by_topic(topic: str, mode: str | None = None, limit: int = 40) -> list
     mistake_items: list[NewsItem] = []
     news_items: list[NewsItem] = []
 
-    # 1. Targeted HN Algolia searches (search_by_date with 14-day cutoff for topic relevance)
-    # 1a. Mistakes & Pitfalls on this topic
+    # 1. Google News / Search Multi-Angle Queries (Expanded Sources: Forbes, Tom's Hardware, VentureBeat, TechCrunch, etc.)
+    # Angle A: Direct query (captures hot takes, 'Why Everyone is Talking About...')
+    g_direct = fetch_google_news_search(clean_topic, max_items=12, max_days=14)
+    # Angle B: Developer / Architecture / What people want to hear (captures 'alternative to LLMs', '193x faster', 'benchmarks')
+    g_dev = fetch_google_news_search(f"{search_query} AI benchmark architecture", max_items=10, max_days=14)
+    # Angle C: Pitfalls / Mistakes / Security (captures 'prompt injection risk', 'what everyone gets wrong')
+    g_mistakes = fetch_google_news_search(f"{search_query} mistake pitfall security", default_category=CATEGORY_DEVELOPER_MISTAKE, max_items=8, max_days=14)
+
+    for it in g_direct + g_dev:
+        if it["category"] == CATEGORY_DEVELOPER_MISTAKE:
+            mistake_items.append(it)
+        elif it["category"] == CATEGORY_AI_LEARNING:
+            learning_items.append(it)
+        else:
+            news_items.append(it)
+
+    mistake_items.extend(g_mistakes)
+
+    # 2. Targeted HN Algolia searches
     mistake_queries = [f"{search_query} mistake", f"{search_query} pitfall", f"{search_query} postmortem"]
     for mq in mistake_queries[:2]:
         mistake_items.extend(search_hn_recent(mq, CATEGORY_DEVELOPER_MISTAKE, max_days=14, hits_per_page=8))
 
-    # 1b. Learning & Architecture on this topic
     learning_queries = [f"{search_query} architecture", f"{search_query} guide", f"{search_query} agent"]
     for lq in learning_queries[:2]:
         learning_items.extend(search_hn_recent(lq, CATEGORY_AI_LEARNING, max_days=14, hits_per_page=8))
 
-    # 1c. Direct Topic search on HN
     direct_hn = search_hn_recent(search_query, CATEGORY_LATEST_NEWS, max_days=14, hits_per_page=12)
     for it in direct_hn:
         cat = _classify_story(it["title"])
@@ -527,7 +658,7 @@ def fetch_by_topic(topic: str, mode: str | None = None, limit: int = 40) -> list
         else:
             news_items.append(it)
 
-    # 2. arXiv Search for cutting-edge technical papers (sorted by date descending)
+    # 3. arXiv Search for cutting-edge technical papers (sorted by date descending)
     try:
         encoded_arxiv = search_query.replace(" ", "+")
         arxiv_url = f"http://export.arxiv.org/api/query?search_query=all:{encoded_arxiv}&sortBy=submittedDate&sortOrder=descending&max_results=6"
@@ -536,17 +667,21 @@ def fetch_by_topic(topic: str, mode: str | None = None, limit: int = 40) -> list
     except Exception as e:
         logger.warning("arXiv search failed for '%s': %s", search_query, e)
 
-    # 3. Curated Engineering Feeds match
+    # 4. Expanded Curated Engineering & Tech Feeds match
     try:
         topic_words = set(search_query.lower().split())
         curated_sources = [
+            ("https://feed.infoq.com/", "InfoQ Architecture"),
+            ("https://thenewstack.io/feed/", "The New Stack"),
+            ("https://techcrunch.com/category/artificial-intelligence/feed/", "TechCrunch AI"),
+            ("https://feeds.arstechnica.com/arstechnica/technology-lab", "Ars Technica"),
             ("https://simonwillison.net/atom/everything/", "Simon Willison Weblog"),
             ("https://huggingface.co/blog/feed.xml", "Hugging Face Blog"),
             ("https://blog.cloudflare.com/rss/", "Cloudflare Engineering"),
             ("https://github.blog/category/engineering/feed/", "GitHub Engineering"),
         ]
         for feed_url, source_name in curated_sources:
-            feed_items = fetch_rss_feed(feed_url, source_name, max_items=10, max_days=14)
+            feed_items = fetch_rss_feed(feed_url, source_name, max_items=8, max_days=14)
             for it in feed_items:
                 title_words = set(it["title"].lower().split())
                 if topic_words.intersection(title_words):
@@ -615,6 +750,9 @@ def fetch_all(
         # 1. AI DEVELOPER LEARNING (TOP PRIORITY)
         # -------------------------------------------------------------
         logger.info("Scanning for AI Developer Learning topics (Priority 1)...")
+        # Google News targeted queries for trending developer skills
+        learning_items.extend(fetch_google_news_search("AI agent architecture MCP RAG", default_category=CATEGORY_AI_LEARNING, max_items=10, max_days=5))
+
         # Hacker News targeted AI learning queries
         for q in ["agent", "mcp", "rag", "local llm", "vllm", "structured outputs"]:
             learning_items.extend(search_hn_recent(q, CATEGORY_AI_LEARNING, max_days=5, hits_per_page=6))
@@ -622,7 +760,9 @@ def fetch_all(
         # Dev.to practical AI tutorials
         learning_items.extend(fetch_dev_to(per_page=8, max_days=5))
 
-        # Curated engineering weblogs & arXiv
+        # Premier engineering publications & RSS
+        learning_items.extend(fetch_rss_feed("https://feed.infoq.com/", "InfoQ Architecture", default_category=CATEGORY_AI_LEARNING, max_days=5))
+        learning_items.extend(fetch_rss_feed("https://thenewstack.io/feed/", "The New Stack", default_category=CATEGORY_AI_LEARNING, max_days=5))
         learning_items.extend(fetch_rss_feed("https://simonwillison.net/atom/everything/", "Simon Willison Weblog", default_category=CATEGORY_AI_LEARNING, max_days=5))
         learning_items.extend(fetch_rss_feed("https://huggingface.co/blog/feed.xml", "Hugging Face Blog", default_category=CATEGORY_AI_LEARNING, max_days=7))
         learning_items.extend(fetch_arxiv(max_results=5, max_days=5))
@@ -631,6 +771,7 @@ def fetch_all(
         # 2. DEVELOPER MISTAKES, PITFALLS & POSTMORTEMS (HIGH PRIORITY)
         # -------------------------------------------------------------
         logger.info("Scanning for Developer Mistakes & Pitfalls (Priority 2)...")
+        mistake_items.extend(fetch_google_news_search("software outage postmortem developer pitfall", default_category=CATEGORY_DEVELOPER_MISTAKE, max_items=8, max_days=7))
         for q in ["mistake", "pitfall", "anti-pattern", "postmortem", "debugging"]:
             mistake_items.extend(search_hn_recent(q, CATEGORY_DEVELOPER_MISTAKE, max_days=7, hits_per_page=6))
 
@@ -638,6 +779,8 @@ def fetch_all(
         # 3. LATEST NEWS & MODEL RELEASES (MODERATE PRIORITY)
         # -------------------------------------------------------------
         logger.info("Scanning for Latest AI News & Releases (Priority 3)...")
+        news_items.extend(fetch_google_tech_headlines(max_items=10, max_days=3))
+        news_items.extend(fetch_rss_feed("https://techcrunch.com/category/artificial-intelligence/feed/", "TechCrunch AI", default_category=CATEGORY_LATEST_NEWS, max_days=4))
         for q in ["deepseek", "claude", "mistral", "openai"]:
             news_items.extend(search_hn_recent(q, CATEGORY_LATEST_NEWS, max_days=4, hits_per_page=4))
 

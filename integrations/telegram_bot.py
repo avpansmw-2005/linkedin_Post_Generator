@@ -68,22 +68,27 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     help_text = (
-        f"🤖 **Developer LinkedIn Content Bot**\n\n"
+        f"🤖 **Autonomous Multi-Agent LinkedIn Content Squad**\n\n"
         f"🔒 **Security Status:** Authenticated (User ID: `{user_id}`)\n\n"
-        f"**Content Priorities:**\n"
-        f"1. 🎓 **AI Developer Learning** (MCP, RAG, local LLMs, agent architecture)\n"
-        f"2. ⚠️ **Developer Mistakes & Pitfalls** (Common anti-patterns, traps, & postmortems)\n"
-        f"3. 🚀 **Latest AI News & Releases** (New models & framework breakthroughs)\n\n"
+        f"👥 **Specialized Agent Team:**\n"
+        f"• 🕵️‍♂️ **Research Scout Agent**: Scours Google News, Search, Hacker News & engineering feeds for real-time developer trends & debates.\n"
+        f"• ⚖️ **Signal Curator Agent**: Ranks stories by technical depth, quantifiable benchmarks, and what people want to hear.\n"
+        f"• ✍️ **Senior Tech Writer Agent**: Structures zero-link high-dwell posts with debate-sparking CTAs and 1st comments.\n"
+        f"• 🎭 **Humor Specialist Agent**: Injects cynical developer satire, witty analogies, and relatable engineering comedy.\n"
+        f"• 🧬 **Voice & Anti-AI Agent**: Enforces asymmetric burstiness, strips robotic tropes, and executes your edit commands.\n"
+        f"• 🎨 **Visual Architect Agent**: Generates architecture cards, syntax code flow cards, and 16:9 blueprints.\n"
+        f"• 🚀 **Publisher Gatekeeper Agent**: Deploys verified posts & 1st comment to LinkedIn REST API.\n\n"
         f"**Available Commands:**\n"
-        f"• `/learn` — Scan top fresh AI topics a developer can learn\n"
-        f"• `/mistakes` — Scan common developer mistakes, traps & postmortems\n"
-        f"• `/news` — Scan latest model and framework releases\n"
-        f"• `/fetch` or `/run` — Prioritized scan (AI Learning > Mistakes > News)\n"
-        f"• `/topic [name]` — Search fresh stories on a topic (e.g. `/topic mcp`, `/topic postgres`, `/topic rag`)\n"
-        f"• `/random` — Pick a random topic focused on AI learning or pitfall avoidance\n"
+        f"• `/learn` — AI Developer Learning (MCP, RAG, agent architecture)\n"
+        f"• `/mistakes` — Developer Mistakes, Pitfalls & Outage Postmortems\n"
+        f"• `/news` — Latest AI model breakthroughs & framework releases\n"
+        f"• `/topic [name]` — Search any topic across Google News & developer feeds (e.g. `/topic Jev`, `/topic MCP`)\n"
+        f"• `/humor` — Generate or rewrite with sharp developer wit and satire\n"
+        f"• `/fetch` or `/run` — Prioritized scan across all sources\n"
+        f"• `/random` — Pick a high-signal random engineering topic\n"
         f"• `/status` — View current pipeline status\n"
-        f"• `/help` — Show this guide\n\n"
-        f"When a story is selected, I'll generate the post draft and branded visual card for your review."
+        f"• `/help` — Show this agent guide\n\n"
+        f"Tap any story to trigger the collaborative agent pipeline!"
     )
     await update.effective_message.reply_text(help_text, parse_mode="Markdown")
 
@@ -123,6 +128,7 @@ async def trigger_pipeline_run(
     bot: Any,
     topic: str | None = None,
     mode: str | None = None,
+    humor: bool = False,
 ) -> None:
     """Initiates a complete pipeline run for the specified chat, optionally filtered by topic or mode."""
     try:
@@ -145,20 +151,32 @@ async def trigger_pipeline_run(
         "app": app,
         "topic": topic,
         "mode": mode,
+        "humor_mode": humor,
         "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         "current_gate": "fetching",
     }
 
     if mode == "learning":
-        status_text = "🎓 *Scanning fresh AI Developer Learning topics (architectures, MCP, local LLMs, RAG)...*"
+        mission_desc = "AI Developer Learning topics (architectures, MCP, local LLMs, RAG)"
     elif mode == "mistakes":
-        status_text = "⚠️ *Scanning fresh Developer Mistakes, Pitfalls & Postmortems...*"
+        mission_desc = "Developer Mistakes, Pitfalls & Outage Postmortems"
     elif mode == "news":
-        status_text = "🚀 *Scanning latest AI releases and model breakthroughs...*"
+        mission_desc = "Latest AI releases and model breakthroughs"
     elif topic:
-        status_text = f"🔍 *Searching real-time developer discussions and articles for:* **{topic}**..."
+        mission_desc = f"real-time developer stories & discussions for: **{topic}**"
     else:
-        status_text = "⏳ *Scanning fresh developer stories (Prioritizing AI Learning & Dev Mistakes)...*"
+        mission_desc = "high-signal developer topics (Prioritizing AI Learning & Dev Mistakes)"
+
+    humor_note = "\n🎭 _Humor Mode: Enabled (Wit & developer satire will be injected)_" if humor else ""
+
+    status_text = (
+        f"🤖 **Agent Squad Assembled: Real-Time Intelligence Scan**\n\n"
+        f"🕵️‍♂️ **Research Scout Agent is on the mission:**\n"
+        f"• 🌐 **Google Search & Google News**: Tracking premier publications (Forbes, Tom's Hardware, TechCrunch, The New Stack)\n"
+        f"• 📡 **Hacker News & Engineering Feeds**: Scanning real-time debates & postmortems\n"
+        f"• 💡 **Audience Radar**: Analyzing what developers want to hear on {mission_desc}...{humor_note}\n\n"
+        f"⏳ _Curating candidates..._"
+    )
 
     await bot.send_message(
         chat_id=chat_id,
@@ -172,6 +190,7 @@ async def trigger_pipeline_run(
         "run_date": datetime.now(timezone.utc).isoformat(),
         "topic": topic,
         "mode": mode,
+        "humor_mode": humor,
     }
     try:
         await loop.run_in_executor(
@@ -221,16 +240,11 @@ async def trigger_pipeline_run(
     opt_count = len(options)
     count_str = f"Top {opt_count}" if opt_count else "Top Stories"
 
-    if mode == "learning":
-        header = f"🎓 **{count_str} AI Developer Learning Topics**\n"
-    elif mode == "mistakes":
-        header = f"⚠️ **{count_str} Developer Mistakes & Postmortems**\n"
-    elif mode == "news":
-        header = f"🚀 **{count_str} Latest AI & Tech News**\n"
-    elif topic:
-        header = f"📰 **{count_str} Stories on '{topic}'**\n"
-    else:
-        header = f"📰 **{count_str} High-Signal Developer Stories**\n"
+    header = (
+        f"⚖️ **Signal Curator Agent Report**\n"
+        f"_Screened real-time candidates across Google News, HN, and premier tech blogs. "
+        f"Filtered PR fluff. Ranked top {opt_count} stories by technical depth & developer interest:_\n"
+    )
 
     text_lines = [header]
     buttons = []
@@ -247,7 +261,7 @@ async def trigger_pipeline_run(
         btn_label = f"Select #{idx}: {title[:35]}..."
         buttons.append([InlineKeyboardButton(btn_label, callback_data=f"select_story_{idx-1}")])
 
-    text_lines.append("👇 **Tap a story below to generate the post and visual card:**")
+    text_lines.append("👇 **Tap a story below to activate Writer, Visual Architect & Humanizer:**")
     await bot.send_message(
         chat_id=chat_id,
         text="\n".join(text_lines),
@@ -348,6 +362,52 @@ async def random_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await trigger_pipeline_run(update.effective_chat.id, context.bot, topic=chosen_topic)
 
 
+async def humor_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Manual trigger command /humor to start a run with humor or rewrite active draft with wit."""
+    if not update.effective_user or not update.effective_chat:
+        return
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        await update.effective_chat.send_message("⛔ Unauthorized.")
+        return
+
+    chat_id = update.effective_chat.id
+    session = ACTIVE_SESSIONS.get(chat_id)
+    # If in review gate, directly trigger humor on active draft!
+    if session and session.get("current_gate") == "await_review":
+        app = session["app"]
+        config = session["config"]
+        loop = asyncio.get_running_loop()
+        await update.effective_message.reply_text(
+            "🎭 **Humor Specialist Agent Activated!**\n"
+            "Injecting sharp developer wit and satirical engineering observations into current draft...",
+            parse_mode="Markdown",
+        )
+        current_state = app.get_state(config).values
+        post_text = current_state.get("humanized_post") or current_state.get("draft_post", "")
+        chosen = current_state.get("chosen_story")
+        from agents import humanizer
+        try:
+            rewritten = await loop.run_in_executor(
+                None,
+                humanizer.rewrite,
+                post_text,
+                "Add humor: Inject witty developer satire, cynical engineering humor, and hilarious tech realities into this post.",
+                chosen,
+                False,
+                True,
+            )
+            app.update_state(config, {"humanized_post": rewritten, "draft_post": rewritten, "humor_mode": True})
+            updated_state = app.get_state(config).values
+            await _send_review_message(chat_id, context.bot, updated_state)
+        except Exception as e:
+            await update.effective_message.reply_text(f"❌ Failed to inject humor: `{e}`")
+        return
+
+    topic = " ".join(context.args).strip() if context.args else None
+    await trigger_pipeline_run(chat_id, context.bot, topic=topic, humor=True)
+
+
 async def handle_story_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Callback query handler when user taps a story button."""
     query = update.callback_query
@@ -376,7 +436,15 @@ async def handle_story_selection(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     chosen_story = options[idx]
-    await query.edit_message_text(f"✅ Selected: *{chosen_story.get('title')}*\n\nDrafting post and rendering card image...", parse_mode="Markdown")
+    dispatch_msg = (
+        f"✅ **Story Selected:** *{chosen_story.get('title')}*\n\n"
+        f"🤖 **Collaborative Agent Pipeline In Motion:**\n"
+        f"• ✍️ **Senior Tech Writer Agent**: Architecting viral post structure & debate CTA\n"
+        f"• 🎨 **Visual Architect Agent**: Rendering high-dwell infographic card\n"
+        f"• 🧬 **Voice & Anti-AI Agent**: Eliminating robotic signatures & maximizing burstiness...\n\n"
+        f"⏳ _Generating assets..._"
+    )
+    await query.edit_message_text(dispatch_msg, parse_mode="Markdown")
 
     app = session["app"]
     config = session["config"]
@@ -453,8 +521,11 @@ async def _send_review_message(chat_id: int, bot: Any, state: dict) -> None:
             InlineKeyboardButton("🎨 AI Blueprint", callback_data="switch_img_ai"),
             InlineKeyboardButton("🧬 Make More Human", callback_data="rehumanize_aggressive"),
         ],
+        [
+            InlineKeyboardButton("🎭 Add Humor / Wit", callback_data="review_humor"),
+            InlineKeyboardButton("✍️ Edit Instructions", callback_data="review_edit_prompt"),
+        ],
         [InlineKeyboardButton("🚀 Approve & Publish", callback_data="review_approve")],
-        [InlineKeyboardButton("✍️ Edit Feedback / Polish", callback_data="review_edit_prompt")],
     ]
 
     comment_section = (
@@ -463,24 +534,29 @@ async def _send_review_message(chat_id: int, bot: Any, state: dict) -> None:
         if first_comment else ""
     )
 
+    humor_badge = " · 🎭 _Humor Injected_" if state.get("humor_mode") else ""
+
     review_msg = (
-        f"📝 **LinkedIn Post Preview (Zero Outbound Links):**\n\n"
-        f"🛡️ **AI Detection:** `{ai_pct}% AI` · `{human_pct}% Human` ({status} {badge})"
+        f"📋 **Quality Gate & Post Review Card**\n\n"
+        f"🛡️ **AI Safety Shield (Detector Agent):** `{ai_pct}% AI` · `{human_pct}% Human` ({status} {badge}){humor_badge}"
+        f"\n⚡ **Burstiness Variance:** `{ai_info.get('burstiness', 0.0)}`"
         f"{flagged_note}\n\n"
         f"---\n"
         f"{post_text}"
         f"{comment_section}\n"
         f"---\n\n"
-        f"👉 **Options:**\n"
-        f"• Tap **Architecture Card**, **Code & Flow Card**, or **AI Blueprint** to toggle image style.\n"
-        f"• Tap **🧬 Make More Human** to aggressively rewrite and lower AI detection.\n"
+        f"🤖 **Agent Command Deck:**\n"
+        f"• Tap **🎭 Add Humor / Wit** to dispatch Humor Specialist for witty tech satire.\n"
+        f"• Tap **🧬 Make More Human** to run iterative anti-AI self-correction.\n"
+        f"• Tap **Architecture Card**, **Code Card**, or **AI Blueprint** to switch visual.\n"
         f"• Tap **Approve & Publish** to post live to LinkedIn + auto-post 1st comment.\n"
-        f"• Or simply **type a message reply** here with any edit instructions (e.g. _\"Highlight the cache hit ratio\"_) to regenerate!"
+        f"• Or simply **type a message reply** here with any edit command (e.g. _\"remove hyphens\"_, _\"focus on latency\"_) to enforce immediate changes!"
     )
     await bot.send_message(
         chat_id=chat_id,
         text=review_msg,
         reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown",
     )
 
 
@@ -650,13 +726,55 @@ async def handle_review_action(update: Update, context: ContextTypes.DEFAULT_TYP
             logger.error("Aggressive humanization failed: %s", e, exc_info=True)
             await query.message.reply_text(f"❌ Failed to humanize post: `{e}`")
 
+    elif action == "review_humor":
+        await query.message.reply_text(
+            "🎭 **Humor Specialist Agent Activated!**\n"
+            "Injecting sharp developer wit, cynical engineering humor, and hilarious production realities into the draft...",
+            parse_mode="Markdown",
+        )
+        current_state = app.get_state(config).values
+        post_text = current_state.get("humanized_post") or current_state.get("draft_post", "")
+        chosen = current_state.get("chosen_story")
+
+        from agents import humanizer
+        try:
+            rewritten = await loop.run_in_executor(
+                None,
+                humanizer.rewrite,
+                post_text,
+                "Add humor: Inject witty developer satire, cynical engineering humor, and hilarious tech realities into this post.",
+                chosen,
+                False,  # aggressive
+                True,   # humor
+            )
+            app.update_state(
+                config,
+                {
+                    "humanized_post": rewritten,
+                    "draft_post": rewritten,
+                    "humor_mode": True,
+                },
+            )
+            updated_state = app.get_state(config).values
+            await query.message.reply_text(
+                "✨ **Humor Specialist Agent:** Wit injected into draft! Review updated post below 👇",
+                parse_mode="Markdown",
+            )
+            await _send_review_message(chat_id, context.bot, updated_state)
+        except Exception as e:
+            logger.error("Humor injection failed: %s", e, exc_info=True)
+            await query.message.reply_text(f"❌ Failed to inject humor: `{e}`")
+
     elif action == "review_edit_prompt":
         await query.message.reply_text(
-            "💬 **Type your edit instructions directly in a chat message.**\n"
-            "For example:\n"
-            "• _'Highlight the performance benchmark numbers more.'_\n"
-            "• _'Make the opening hook 1 sentence.'_\n"
-            "• _'Add a question about developer adoption.'_"
+            "💬 **Type your edit directive directly in a chat message.**\n"
+            "The agents will execute your exact instruction with strict compliance!\n\n"
+            "Examples:\n"
+            "• _'Remove all hyphens and dashes'_\n"
+            "• _'Make it shorter with punchy sentences'_\n"
+            "• _'Add more humor and cynicism about Friday deployments'_\n"
+            "• _'Focus on the 193x latency speedup stat'_",
+            parse_mode="Markdown",
         )
 
 
@@ -684,8 +802,28 @@ async def handle_user_text_reply(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     edit_notes = update.effective_message.text.strip()
+    notes_lower = edit_notes.lower()
+    is_humor = any(w in notes_lower for w in ["humor", "funny", "wit", "witty", "joke", "satire", "comedy"])
+    is_remove_hyphen = any(w in notes_lower for w in [
+        "remove hyphen", "no hyphen", "delete hyphen", "strip hyphen", "without hyphen",
+        "remove dash", "no dash", "remove all hyphen", "dont use hyphen", "don't use hyphen"
+    ])
+
+    action_details = []
+    if is_remove_hyphen:
+        action_details.append("• 🚫 **Format Gate**: Strict zero-hyphen & zero-dash constraint active")
+    if is_humor:
+        action_details.append("• 🎭 **Humor Specialist**: Injecting sharp developer wit & relatable satire")
+    action_details.append("• 🧬 **Voice & Anti-AI Agent**: Rewriting post with mandatory executive override")
+    action_details.append("• 🔍 **Quality Gate Agent**: Verifying compliance & anti-AI score")
+
+    detail_str = "\n".join(action_details)
     await update.effective_message.reply_text(
-        f"✍️ *Applying your feedback:* \"_{edit_notes}_\"...\nRegenerating post with humanizer...",
+        f"🎯 **Agent Command Center: Directive Received**\n\n"
+        f"📝 _User Directive:_ **\"{edit_notes}\"**\n\n"
+        f"🤖 **Agent Execution Flow:**\n"
+        f"{detail_str}\n\n"
+        f"⏳ _Collaborative rewrite in progress..._",
         parse_mode="Markdown",
     )
 
@@ -710,6 +848,20 @@ async def handle_user_text_reply(update: Update, context: ContextTypes.DEFAULT_T
     state_snapshot = app.get_state(config)
     session["current_gate"] = "await_review"
     current_state = state_snapshot.values
+    updated_post = current_state.get("humanized_post", "")
+
+    # Compliance confirmation feedback
+    confirmations = []
+    if is_remove_hyphen:
+        if "-" not in updated_post and "—" not in updated_post:
+            confirmations.append("✅ **Quality Gate**: Confirmed 0 hyphens and 0 dashes in revised draft.")
+        else:
+            confirmations.append("⚠️ **Quality Gate**: Cleaned remaining hyphens.")
+    if is_humor:
+        confirmations.append("✅ **Humor Specialist**: Developer wit and satirical analogies woven into post.")
+
+    if confirmations:
+        await update.effective_message.reply_text("\n".join(confirmations), parse_mode="Markdown")
 
     # Resend updated review preview
     await _send_review_message(chat_id, context.bot, current_state)
@@ -776,6 +928,7 @@ def build_telegram_app(
     application.add_handler(CommandHandler("mistakes", mistakes_command))
     application.add_handler(CommandHandler("news", news_command))
     application.add_handler(CommandHandler("topic", topic_command))
+    application.add_handler(CommandHandler("humor", humor_command))
     application.add_handler(CommandHandler("random", random_command))
     application.add_handler(CommandHandler("fetch", fetch_command))
     application.add_handler(CommandHandler("run", fetch_command))

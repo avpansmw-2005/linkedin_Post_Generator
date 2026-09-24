@@ -106,12 +106,29 @@ CRITICAL ANTI-DETECTION HEURISTICS:
    - NEVER use cheesy marketer slang ("Boom!", "Like a pro", "Instant fortress").
 4. Authentic Engineering Substance:
    - Speak with first-person technical authority ("When we benchmarked...", "A hard lesson we learned...", "If you give an LLM bash access...").
-   - Mention concrete technical levers: p99 latency, kernel namespaces, read-only tmpfs, memory footprints, CVEs, eBPF, gVisor vs microVMs."""
+   - Mention concrete technical levers: p99 latency, kernel namespaces, read-only tmpfs, memory footprints, CVEs, eBPF, gVisor vs microVMs.
+
+HUMOR & RELATABLE DEVELOPER WIT (WHEN HUMOR IS REQUESTED):
+- Deliver high-signal technical truth wrapped in sharp, laugh-out-loud developer satire and relatable engineering comedy.
+- Joke about classic engineering realities:
+  * Deploying on Friday at 4:59 PM and trusting the monitoring alerts.
+  * Our autonomous agent loop achieving sentience purely via runaway token bills.
+  * 4 hours spent debugging what turned out to be an invisible indentation in YAML.
+  * Pitching a distributed microservices rewrite when the real problem was an unindexed query.
+  * The gap between marketing hype ("AGI next quarter") and terminal reality ("Why is my socket hanging?").
+- The joke must illuminate an architectural truth, not obscure it. Avoid cheesy puns; use dry, authentic developer wit."""
 
 
-def write(story: RankedItem) -> dict:
-    """Generates a complete post draft from a chosen ranked story."""
+def write(story: RankedItem, humor: bool = False) -> dict:
+    """Generates a complete post draft from a chosen ranked story, with optional humor injection."""
     category = story.get("category", "ai_learning")
+    humor_instruction = ""
+    if humor:
+        humor_instruction = (
+            "\n🎭 HUMOR DIRECTIVE: Inject sharp, witty, laugh-out-loud developer satire into this post! "
+            "Make it relatable, cynical about engineering pain points, and hilarious while maintaining deep technical accuracy.\n"
+        )
+
     user_prompt = (
         f"Chosen Story:\n"
         f"Category: {category}\n"
@@ -119,7 +136,8 @@ def write(story: RankedItem) -> dict:
         f"Source: {story.get('source', '')}\n"
         f"URL: {story.get('url', '')}\n"
         f"Summary: {story.get('summary', '')}\n"
-        f"Selection Reason: {story.get('reason', '')}\n\n"
+        f"Selection Reason: {story.get('reason', '')}\n"
+        f"{humor_instruction}\n"
         f"Draft a compelling, technically rigorous LinkedIn post based on this {category.replace('_', ' ')} story. "
         f"Remember: NEVER include the outbound URL in the body text; set first_comment with the URL and end the post with a debate-sparking CTA and comment pointer."
     )
@@ -129,7 +147,7 @@ def write(story: RankedItem) -> dict:
             system=WRITER_SYSTEM_PROMPT,
             user=user_prompt,
             schema=LinkedInDraft,
-            temperature=0.6,
+            temperature=0.75 if humor else 0.6,
         )
 
         # Assemble full text WITHOUT external links

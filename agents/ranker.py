@@ -65,6 +65,14 @@ VARIETY & DIVERSITY ENFORCEMENT:
 - High Substance: Must contain concrete technical takeaways, not marketing fluff or PR.
 - Category Tagging: Assign each item its exact category: 'ai_learning', 'developer_mistake', or 'latest_news'.
 
+WHAT PEOPLE WANT TO HEAR & AUDIENCE RESONANCE (CRITICAL SCORING FACTOR):
+- Prioritize stories that answer what developers, architects, and tech practitioners ACTUALLY want to hear:
+  1) The truth behind the hype: "Why everyone is talking about X", "What everyone gets wrong about X".
+  2) Quantifiable benchmarks & efficiency: "193x faster, 445x cheaper", latency p99 stats, memory overhead, token savings.
+  3) Production security & hidden risks: prompt injection, runtime vulnerabilities, silent failure modes.
+  4) Practical implementation guides: real-world architectures with LangChain, FastAPI, Redis, typed schemas.
+- Prefer reputable, diverse sources (Forbes, Tom's Hardware, VentureBeat, TechCrunch, The Register, KDnuggets, HackerNoon, InfoQ, The New Stack, Hacker News, arXiv).
+
 STRICTLY REJECT & PENALIZE (Score: 0.0 - 3.0):
 - Stale/old stories, buyer's guides, non-technical listicles, corporate drama, funding rounds, spam, or basic fluff.
 

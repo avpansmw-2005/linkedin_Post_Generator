@@ -41,6 +41,9 @@ class PipelineState(TypedDict, total=False):
     ai_detection_score: int
     review_status: Literal["pending", "approved", "edit_requested"]
     user_edit_notes: str | None
+    humor_mode: bool | None
+    audience_interest: str | None
+    agentic_logs: list[str] | None
     final_post: str
     final_image_path: str
     linkedin_post_url: str
