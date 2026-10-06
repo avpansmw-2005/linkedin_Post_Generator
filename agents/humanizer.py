@@ -20,18 +20,26 @@ class HumanizedPost(BaseModel):
     )
 
 
-HUMANIZER_SYSTEM_PROMPT = """You are a battle-tested Principal Software Engineer refining a LinkedIn post draft.
-Your job is to rewrite the text so it reads 100% human, eliminating robotic AI signatures and completely defeating AI detectors (ZeroGPT, CopyLeaks, GPTZero).
+HUMANIZER_SYSTEM_PROMPT = """You are a thoughtful senior software engineer refining a LinkedIn post draft.
+Your job is to rewrite the text in clear, normal English that sounds 100% human, eliminating robotic AI signatures while keeping the post engaging, natural, and credible.
 
-CRITICAL ANTI-DETECTION HEURISTICS:
-1. High Burstiness & Asymmetric Rhythm:
-   - Mix ultra-short 2-to-4 word sentences ("Don't do it.", "It failed.", "Zero exceptions.") with dense, highly specific 20-word technical explanations.
-   - Never write three sentences of uniform length in a row.
-   - Break monotony with natural developer cadence, contractions (we've, doesn't, isn't), and occasional sentence fragments.
-2. ZERO High-School Textbook Definitions:
-   - NEVER explain what basic tools are ("Docker is a containerization platform", "Containers are lightweight units"). Senior engineers already know.
-   - Jump straight into the architectural decision, the kernel boundary, the benchmark latency, or the edge-case failure mode.
-3. BANNED AI Transition Tropes (Instant 100% AI flags):
+CRITICAL TONE & VOCABULARY GUIDELINES:
+1. PRESERVE TECHNICAL TERMS (MANDATORY):
+   - Keep all concrete technical words, tools, metrics, and architecture terms intact (e.g. latency, KV cache, RAG retrieval, token usage, PostgreSQL, Docker, APIs, GPU memory, concurrency, query plans).
+   - Senior engineers and developers care about real engineering mechanisms; never remove or dumb down technical accuracy.
+2. USE NORMAL ENGLISH & BAN HARD VOCABULARY:
+   - Use simple, everyday, conversational English. Write like a smart engineer chatting with a colleague over coffee.
+   - BANNED HARD / PRETENTIOUS VOCABULARY: NEVER use fancy, academic, or obscure words such as:
+     ephemeral, paradigm, esoteric, concomitant, heterogeneous, ubiquitous, tapestry, dichotomy, behemoth, delve, harness.
+   - Keep sentence structures clean, direct, and easy to read. Avoid convoluted, multi-clause run-ons.
+3. STRICT ZERO-HYPHEN RULE:
+   - You MUST NOT use ANY hyphens or dashes anywhere in your text! Zero hyphens allowed.
+   - NEVER use '-' (hyphen), '—' (em-dash), or '–' (en-dash).
+   - Write compound words without hyphens (e.g. write 'real world', 'high signal', 'open source', 'end to end', 'state of the art', 'up to date', 'token aware').
+   - For lists, use unicode dots (•), numbers (1., 2.), or clean paragraph line breaks. Never start a bullet with '-'.
+   - For pauses, use commas or separate sentences instead of dashes.
+   - In benchmark stats, write '68% lower latency' or 'down 40%', never '-68%'.
+4. BANNED AI Transition Tropes (Instant 100% AI flags):
    - NEVER use: "The benefits are pretty straightforward:"
    - NEVER use: "Of course, there are some trade-offs."
    - NEVER use: "Curious to hear how others are balancing..."
@@ -39,64 +47,91 @@ CRITICAL ANTI-DETECTION HEURISTICS:
    - NEVER use: "When it comes to..."
    - NEVER use: "Harness the power", "Game changer", "Dive deep", "Delve", "Tapestry", "Beacon of innovation".
    - NEVER use cheesy marketer slang ("Boom!", "Like a pro", "Instant fortress").
-4. Authentic Engineering Substance:
-   - Speak with first-person technical authority ("When we benchmarked...", "A hard lesson we learned...", "If you give an LLM bash access...").
-   - Mention concrete technical levers: p99 latency, kernel namespaces, read-only tmpfs, memory footprints, CVEs, eBPF, gVisor vs microVMs.
-5. Formatting & Layout:
-   - Short, punchy paragraphs with double line breaks.
+5. Natural Cadence & Authentic Substance:
+   - Mix punchy short sentences with clear explanations. Avoid monotonous sentence lengths.
+   - Speak with firsthand developer conviction ("When we benchmarked this...", "A hard lesson we learned...", "If you give an LLM shell access...").
+   - ZERO High-School Textbook Definitions: Senior engineers already know what basic tools are ("Docker is a container tool"). Jump straight into how the system works or breaks.
+6. Formatting & Layout:
+   - Short, readable paragraphs with double line breaks.
    - ZERO Outbound Links: NEVER insert external URLs or http/https links in the body. All links belong in the 1st comment.
    - Preserve the conversation starter question (CTA) and comment pointer ('👇 Check the source in the comments!'), along with hashtags at the bottom.
-6. ABSOLUTE SUPREMACY OF USER EDIT DIRECTIVES:
-   - When User Edit Feedback / Directives are passed, they are MANDATORY EXECUTIVE ORDERS that OVERRIDE all default formatting and styling rules.
-   - If the user commands to remove hyphens, dashes, or bullet points: You MUST NEVER output '-' or '—' anywhere in the post! Use natural flowing narrative sentences, numbered lists (1., 2.), unicode dots (•), or paragraph breaks instead.
-   - If the user commands to add humor / wit: You MUST inject hilarious developer satire, witty analogies, and relatable engineering comedy.
-   - If the user commands to remove hashtags, emojis, or change specific sentences: You MUST do so immediately.
-   - Disobeying an explicit user edit command is strictly forbidden."""
+7. ABSOLUTE SUPREMACY OF USER EDIT DIRECTIVES:
+   - When User Edit Feedback is provided, it is a MANDATORY EXECUTIVE ORDER that overrides defaults.
+   - If the user commands humor / wit: Inject funny developer satire and relatable engineering comedy (e.g. deploying on Friday, runaway cloud bills, broken pipelines, YAML indentation) using simple, everyday words. Keep vocabulary normal and technical concepts accurate."""
+
+
+def strip_all_hyphens(text: str) -> str:
+    """Deterministically removes and replaces all hyphens, en-dashes, and em-dashes
+    from the text, ensuring zero hyphens remain in the English text while preserving
+    valid URLs intact.
+    """
+    if not text:
+        return text
+
+    # Protect any URLs so their paths are not broken
+    urls: list[str] = []
+
+    def _save_url(m: re.Match) -> str:
+        urls.append(m.group(0))
+        return f"__URL_PLACEHOLDER_{len(urls)-1}__"
+
+    text = re.sub(r'https?://\S+', _save_url, text)
+
+    # 1. Replace em-dashes, en-dashes, and unicode dash variants with clean comma or space
+    for dash in ["—", "–", "‒", "―", "−", "‐", "‑"]:
+        text = text.replace(dash, ", ")
+
+    # 2. Handle line-start bullet hyphens: "- item" -> "• item"
+    lines = []
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("- ") or stripped.startswith("• -"):
+            line = re.sub(r'^\s*[-•]\s*[-–—]?\s*', '• ', line)
+        elif stripped.startswith("-"):
+            line = re.sub(r'^\s*[-–—]\s*', '• ', line)
+        # Replace inline spaced dash " - " or " -- " -> ", "
+        line = re.sub(r'\s+[-–—]+\s+', ', ', line)
+        lines.append(line)
+    text = "\n".join(lines)
+
+    # 3. Handle negative numbers or benchmark stats: "-68%" -> "68%"
+    text = re.sub(r'(^|\s)-(\d+)', r'\1\2', text)
+
+    # 4. Handle compound words: "real-world" -> "real world", "high-signal" -> "high signal"
+    text = re.sub(r'([a-zA-Z0-9])-([a-zA-Z0-9])', r'\1 \2', text)
+
+    # 5. Eliminate any remaining stray '-' or unicode dashes
+    for ch in ["-", "—", "–", "‒", "―", "−", "‐", "‑"]:
+        text = text.replace(ch, "")
+
+    # 6. Clean up any accidental double spaces or comma anomalies resulting from replacements
+    text = re.sub(r'[ ]{2,}', ' ', text)
+    text = re.sub(r',\s*,', ',', text)
+    text = re.sub(r'\s+,', ',', text)
+
+    # Restore URLs
+    for idx, u in enumerate(urls):
+        text = text.replace(f"__URL_PLACEHOLDER_{idx}__", u)
+
+    return text
 
 
 def enforce_user_constraints(text: str, edit_notes: str | None) -> str:
     """Deterministically validates and enforces user editorial constraints on the generated text.
-    Guarantees 100% compliance with explicit user commands (e.g. removing hyphens, emojis, hashtags).
+    Unconditionally guarantees zero hyphens or dashes in all outputs, and obeys explicit user commands
+    (e.g. removing emojis, hashtags).
     """
-    if not edit_notes or not text:
+    if not text:
         return text
 
-    notes_lower = edit_notes.lower()
+    notes_lower = (edit_notes or "").lower()
 
-    # 1. Hyphen & Dash Removal Constraint
-    if any(k in notes_lower for k in [
-        "remove hyphen", "no hyphen", "delete hyphen", "strip hyphen", "without hyphen",
-        "remove dash", "no dash", "remove all hyphen", "get rid of hyphen", "eliminate hyphen",
-        "drop hyphen", "without any hyphen", "don't use hyphen", "dont use hyphen"
-    ]):
-        logger.info("Deterministic gate: Enforcing zero-hyphen constraint per user directive")
-        # Replace em-dashes and en-dashes
-        text = text.replace("—", ", ").replace("–", ", ")
-
-        # Replace bullet points starting with hyphens
-        lines = []
-        for line in text.split("\n"):
-            stripped = line.strip()
-            if stripped.startswith("- "):
-                line = re.sub(r'^\s*-\s*', '', line)
-            elif stripped.startswith("-"):
-                line = re.sub(r'^\s*-\s*', '', line)
-            # Replace inline parenthetical hyphens " - " with ", "
-            line = re.sub(r'\s+-\s+', ', ', line)
-            lines.append(line)
-        text = "\n".join(lines)
-
-        # Replace compound word hyphens with spaces (e.g. "real-world" -> "real world", "high-signal" -> "high signal")
-        text = re.sub(r'([a-zA-Z0-9])-([a-zA-Z0-9])', r'\1 \2', text)
-        # Eliminate any remaining stray '-'
-        text = text.replace("-", "")
-
-    # 2. Hashtag Removal Constraint
+    # 1. Hashtag Removal Constraint
     if any(k in notes_lower for k in ["remove hashtag", "no hashtag", "delete hashtag", "strip hashtag", "without hashtag"]):
         logger.info("Deterministic gate: Enforcing zero-hashtag constraint per user directive")
         text = re.sub(r'#\w+', '', text).strip()
 
-    # 3. Emoji Removal Constraint
+    # 2. Emoji Removal Constraint
     if any(k in notes_lower for k in ["remove emoji", "no emoji", "delete emoji", "strip emoji", "without emoji"]):
         logger.info("Deterministic gate: Enforcing zero-emoji constraint per user directive")
         try:
@@ -104,6 +139,9 @@ def enforce_user_constraints(text: str, edit_notes: str | None) -> str:
             text = emoji.replace_emoji(text, replace='')
         except Exception:
             text = re.sub(r'[\U00010000-\U0010ffff]', '', text)
+
+    # 3. Universal Zero-Hyphen Constraint (Mandatory for all outputs)
+    text = strip_all_hyphens(text)
 
     return text
 
@@ -147,10 +185,11 @@ def rewrite_with_feedback_loop(
             user_instructions.append(
                 "🔥 ULTRA-AGGRESSIVE ANTI-AI REWRITE DIRECTIVE:\n"
                 "- Defeat GPTZero and ZeroGPT AI detectors completely (target: < 15% AI score / > 85% Human).\n"
-                "- Radically break rhythmic uniformity. Inject extreme burstiness: alternate punchy 2-4 word sentences ('Don't do it.', 'Total silence.', 'Zero exceptions.', 'It failed.') right next to 20-25 word technical explanations.\n"
-                "- MANDATORY ASYMMETRY: Do NOT make every sentence short. Write at least two deep, multi-clause technical sentences (20-28 words) directly adjacent to 2-4 word punchy sentences.\n"
-                "- Eliminate ALL high-school textbook definitions and generic transitions like 'The benefits are straightforward' or 'Of course, there are trade-offs'.\n"
-                "- Frame everything with gritty developer realism and firsthand architectural conviction.\n"
+                "- Use simple, normal, conversational English. Keep concrete technical terms (e.g. latency, KV cache, token usage, PostgreSQL, Docker, APIs) intact, but use clean, everyday words.\n"
+                "- BANNED: Do NOT use hard, pretentious, or academic vocabulary (such as ephemeral, paradigm, esoteric, concomitant, heterogeneous, ubiquitous, tapestry, dichotomy).\n"
+                "- STRICT ZERO-HYPHEN RULE: Never use '-' or '—' or '–'. Write compound words without hyphens (real world, open source, high signal). For lists, use unicode dots (•) or numbers.\n"
+                "- Natural cadence: Mix short punchy sentences with simple, direct explanations.\n"
+                "- Eliminate ALL textbook definitions and formulaic transitions.\n"
                 "- ZERO Outbound URLs: Do NOT include raw links or paper URLs in the body. Keep the debate CTA, comment pointer, and hashtags intact."
             )
 
@@ -198,10 +237,11 @@ def rewrite_with_feedback_loop(
                 f"- Flagged Stereotypical AI Tropes: {flagged_str} (MANDATORY: Delete completely, do NOT use these words).",
                 f"- Sentence Length Variance (Burstiness): {score_info['burstiness']:.2f} (Target: > 7.0).",
                 "MANDATORY FIX FOR THIS PASS:",
-                "1. Break sentence length uniformity aggressively! Place 2-to-3 word sentences ('Zero exceptions.', 'It failed.', 'Don't do it.') immediately before or after 20-word technical sentences.",
-                "2. Remove all textbook definitions and AI transition phrases.",
-                "3. Speak like an experienced staff engineer writing directly from terminal experience.",
-                "4. Retain technical accuracy, debate question CTA, comment pointer, and hashtags. NO outbound URLs.",
+                "1. Keep technical terms intact, but rewrite in simple everyday words without hard or pretentious vocabulary.",
+                "2. ZERO hyphens or dashes allowed. Write compound words with spaces.",
+                "3. Alternate short and clear sentences naturally.",
+                "4. Remove all textbook definitions and AI transition phrases.",
+                "5. Retain technical accuracy, debate question CTA, comment pointer, and hashtags. NO outbound URLs.",
             ]
             critique_feedback = "\n".join(critique_lines)
             current_draft = candidate_text
@@ -256,18 +296,22 @@ def rewrite(
             f">>> \"{edit_notes}\" <<<\n\n"
             f"MANDATORY COMPLIANCE RULES:\n"
             f"1. You MUST obey the user's instruction with 100% precision. It overrides any default style rule.\n"
-            f"2. If the user asks to remove hyphens, dashes, or bullet points: DO NOT use ANY '-' or '—' characters anywhere in the post. Use flowing narrative sentences, numbered lists (1., 2.), unicode dots (•), or clean line breaks instead.\n"
-            f"3. If the user asks to add or remove anything, execute it completely.\n"
-            f"4. If the user asks for humor or tone changes, apply them fully.\n"
+            f"2. ZERO HYPHENS: DO NOT use ANY '-' or '—' or '–' characters anywhere in the post. Use flowing narrative sentences, numbered lists (1., 2.), unicode dots (•), or clean line breaks instead.\n"
+            f"3. LANGUAGE: Use normal, clear English with simple vocabulary. Keep real technical terms intact, but ban hard, pretentious words.\n"
+            f"4. If the user asks for humor or tone changes, apply them using relatable, simple tech comedy.\n"
             f"5. Maintain all technical accuracy and keep outbound URLs out of the body."
         )
     else:
-        user_instructions.append("Instruction: Polish this post into an authentic, human engineering voice. Strip all AI fluff. Keep outbound URLs out of the body.")
+        user_instructions.append(
+            "Instruction: Polish this post into an authentic, human engineering voice using simple, normal English and zero hyphens. "
+            "Keep technical terms (e.g. latency, cache, tokens, queries) intact, but eliminate hard, pretentious vocabulary. Keep outbound URLs out of the body."
+        )
 
     if is_humor_requested:
         user_instructions.append(
             "🎭 HUMOR & SATIRE DIRECTIVE: Make this post hilarious, witty, and rich in relatable developer satire! "
-            "Joke about production realities, terminal misery, and engineering hype while maintaining technical accuracy."
+            "Joke about production realities, terminal misery, and engineering hype using simple, punchy, everyday words. "
+            "Do NOT use hard or pretentious vocabulary. Keep technical terms accurate and hyphens at zero."
         )
 
     user_prompt = "\n\n".join(user_instructions)

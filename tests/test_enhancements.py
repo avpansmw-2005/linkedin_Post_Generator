@@ -85,3 +85,63 @@ def test_humanizer_humor_detection():
     )
     result = humanizer.rewrite(sample_draft, edit_notes="add humor and make it funny", humor=True)
     assert len(result) > 20
+
+
+def test_strip_all_hyphens_comprehensive():
+    """Verify that strip_all_hyphens eliminates all forms of hyphens and dashes while preserving URLs."""
+    raw = (
+        "Here is an end-to-end pipeline with real-world token-aware caching.\n"
+        "- First bullet item\n"
+        "- Second bullet item - with an inline dash\n"
+        "Stat: -68% latency drop.\n"
+        "Thought—with an em-dash and range 10–20 with en-dash.\n"
+        "Check code: https://github.com/vllm-project/vllm-v2"
+    )
+    cleaned = humanizer.strip_all_hyphens(raw)
+    # Check that no hyphens or dashes exist outside of URLs
+    text_without_urls = cleaned.replace("https://github.com/vllm-project/vllm-v2", "")
+    assert "-" not in text_without_urls
+    assert "—" not in text_without_urls
+    assert "–" not in text_without_urls
+    # URL is preserved intact
+    assert "https://github.com/vllm-project/vllm-v2" in cleaned
+    # Content is preserved
+    assert "end to end" in cleaned
+    assert "real world" in cleaned
+    assert "token aware" in cleaned
+    assert "68% latency drop" in cleaned
+
+
+def test_humanizer_unconditional_zero_hyphens_no_notes():
+    """Verify that humanizer.enforce_user_constraints strips hyphens even when edit_notes is None."""
+    sample = "A battle-tested model with -40% memory usage.\n- Fast response"
+    result = humanizer.enforce_user_constraints(sample, None)
+    assert "-" not in result
+    assert "battle tested" in result
+    assert "40% memory usage" in result
+
+
+def test_writer_fallback_zero_hyphens():
+    """Verify that writer fallback draft produces zero hyphens."""
+    story: RankedItem = {
+        "title": "Low-Latency Token-Aware Inference",
+        "url": "https://example.com/test",
+        "source": "Tech Blog",
+        "category": "ai_learning",
+        "summary": "State-of-the-art benchmarks for inference.",
+        "score": 9.0,
+        "reason": "Direct benchmark insight",
+    }
+    # Test fallback by passing invalid story or provoking exception handling
+    from agents.writer import write
+    # The normal LLM call might succeed or fail; either way, output text and pillars must have zero hyphens
+    draft = write(story)
+    assert "-" not in draft["text"]
+    assert "—" not in draft["text"]
+    assert "–" not in draft["text"]
+    assert "-" not in draft["card_title"]
+    for pillar in draft["card_pillars"]:
+        assert "-" not in pillar
+    if draft.get("benchmark_stat"):
+        assert "-" not in draft["benchmark_stat"]
+

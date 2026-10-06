@@ -35,35 +35,66 @@ CATEGORY_AI_LEARNING = "ai_learning"
 CATEGORY_DEVELOPER_MISTAKE = "developer_mistake"
 CATEGORY_LATEST_NEWS = "latest_news"
 
-# Developer learning & technical keywords
+# Developer learning & technical software development keywords
 DEV_KEYWORDS = {
-    "python", "typescript", "javascript", "react", "nextjs", "fastapi", "golang", "rust",
-    "sqlite", "postgres", "postgresql", "redis", "docker", "kubernetes", "linux", "git", "github",
-    "database", "databases", "indexing", "query", "sql", "nosql", "btree",
-    "llm", "agent", "agents", "rag", "embeddings", "vllm", "ollama", "langchain", "langgraph",
+    # Core Languages, Compilers & Runtimes
+    "python", "typescript", "javascript", "golang", "go", "rust", "c++", "zig", "java", "kotlin", "swift",
+    "node.js", "nodejs", "bun", "deno", "mojo", "cuda", "wasm", "webassembly", "v8", "compiler", "runtime",
+    "jit", "garbage collection", "memory safety", "borrow checker", "concurrency", "asyncio", "multithreading",
+
+    # Modern Frameworks, Web & Backend
+    "react", "nextjs", "vue", "svelte", "angular", "fastapi", "django", "flask", "express", "actix", "axum",
+    "tailwind", "webgpu", "graphql", "grpc", "protobuf", "rest", "trpc", "websockets", "microservices",
+
+    # Databases, Caching & Storage Systems
+    "sqlite", "postgres", "postgresql", "redis", "duckdb", "clickhouse", "mongodb", "mysql", "cassandra",
+    "pgvector", "qdrant", "milvus", "elasticsearch", "database", "databases", "indexing", "query", "sql",
+    "nosql", "btree", "lsm", "wal", "columnar", "parquet", "sharding", "replication", "acid", "mvcc",
+
+    # Infrastructure, Cloud, DevOps & Distributed Systems
+    "docker", "kubernetes", "k8s", "linux", "git", "github", "gitlab", "terraform", "ansible", "ci/cd",
+    "serverless", "distributed systems", "consensus", "raft", "paxos", "kafka", "rabbitmq", "temporal",
+    "ebpf", "opentelemetry", "prometheus", "grafana", "observability", "envoy", "nginx", "load balancing",
+    "rate limiting", "circuit breaker", "cloud", "aws", "azure", "gcp", "cloudflare workers",
+
+    # Software Architecture & System Design
     "architecture", "system design", "benchmark", "benchmarks", "optimization", "optimizing", "performance",
-    "tutorial", "guide", "how-to", "how to", "deep dive", "postmortem", "debugging",
+    "latency", "throughput", "event-driven", "clean architecture", "domain-driven design", "cqrs",
+    "event sourcing", "modular monolith", "refactoring", "code review", "software engineering", "design patterns",
+    "tutorial", "guide", "how-to", "how to", "deep dive", "postmortem", "debugging", "profiling",
     "open source", "open-source", "library", "sdk", "api", "framework", "release", "releases",
+
+    # AI & Modern ML Engineering
+    "llm", "agent", "agents", "rag", "embeddings", "vllm", "ollama", "llama.cpp", "langchain", "langgraph",
     "deepseek", "mistral", "claude", "openai", "speculative decoding", "transformer", "fine-tuning",
-    "prompt engineering", "context caching", "show hn", "developer", "engineering", "backend",
-    "security", "sandbox", "mcp", "firewall", "tokens", "inference", "evals",
-    "mistake", "pitfall", "antipattern", "anti-pattern", "outage", "incident", "lessons learned"
+    "prompt engineering", "context caching", "show hn", "developer", "engineering", "backend", "frontend",
+    "security", "sandbox", "mcp", "firewall", "tokens", "inference", "evals", "lora",
+
+    # Engineering Pitfalls & Reliability
+    "mistake", "pitfall", "antipattern", "anti-pattern", "outage", "incident", "lessons learned",
+    "race condition", "memory leak", "deadlock", "vulnerability", "cve", "zero-day", "thundering herd"
 }
 
 # Keywords specifically indicating developer mistakes, anti-patterns, or postmortems
 MISTAKE_KEYWORDS = {
     "mistake", "mistakes", "pitfall", "pitfalls", "anti-pattern", "antipattern", "anti-patterns",
     "postmortem", "post-mortem", "outage", "incident", "debugging", "gotcha", "gotchas",
-    "bug", "bugs", "lessons learned", "what went wrong", "avoid", "don't do", "failure",
-    "silent fail", "memory leak", "deadlock", "injection", "vulnerability"
+    "bug", "bugs", "lessons learned", "what went wrong", "avoid", "don't do", "failure", "fail",
+    "silent fail", "memory leak", "deadlock", "injection", "vulnerability", "race condition",
+    "n+1", "connection pool", "thundering herd", "cache stampede", "cascading failure", "cve"
 }
 
-# Keywords specifically indicating AI learning and hands-on skills
+# Keywords specifically indicating developer learning and hands-on technical skills
 AI_LEARNING_KEYWORDS = {
+    # AI & LLM Systems
     "agent", "agents", "mcp", "rag", "vllm", "ollama", "local llm", "fine-tuning",
     "structured outputs", "speculative decoding", "context caching", "prompt engineering",
-    "evals", "vector", "embeddings", "transformer", "architecture", "system design",
-    "tutorial", "guide", "how-to", "how we built", "deep dive"
+    "evals", "vector", "embeddings", "transformer", "lora", "synthetic data",
+    # Core Software Engineering & Architecture Learning
+    "architecture", "system design", "distributed systems", "tutorial", "guide", "how-to",
+    "how we built", "deep dive", "under the hood", "internals", "compiler", "ebpf",
+    "database indexing", "concurrency", "async", "performance tuning", "low latency",
+    "clean code", "best practices", "rust", "golang", "kubernetes", "microservices"
 }
 
 # Negative keywords to filter out business/finance/drama and spam affiliate noise
@@ -468,12 +499,17 @@ def fetch_hacker_news(limit: int = 40, max_days: int = 5) -> list[NewsItem]:
 def fetch_dev_to(per_page: int = 12, max_days: int = 7) -> list[NewsItem]:
     """Fetches latest practical engineering tutorials and debugging guides from Dev.to."""
     items: list[NewsItem] = []
-    # Query high-signal tags for both AI learning and developer mistakes
+    # Query high-signal tags for AI learning, software development, and developer mistakes
     tag_configs = [
         ("ai", CATEGORY_AI_LEARNING),
-        ("machinelearning", CATEGORY_AI_LEARNING),
-        ("debugging", CATEGORY_DEVELOPER_MISTAKE),
         ("programming", CATEGORY_AI_LEARNING),
+        ("architecture", CATEGORY_AI_LEARNING),
+        ("devops", CATEGORY_AI_LEARNING),
+        ("webdev", CATEGORY_AI_LEARNING),
+        ("database", CATEGORY_AI_LEARNING),
+        ("rust", CATEGORY_AI_LEARNING),
+        ("golang", CATEGORY_AI_LEARNING),
+        ("debugging", CATEGORY_DEVELOPER_MISTAKE),
     ]
     try:
         with httpx.Client(timeout=DEFAULT_TIMEOUT) as client:
@@ -555,6 +591,110 @@ def fetch_arxiv(max_results: int = 6, max_days: int = 7) -> list[NewsItem]:
         f"&sortBy=submittedDate&sortOrder=descending&max_results={max_results}"
     )
     return fetch_rss_feed(url, "arXiv Engineering", default_category=CATEGORY_AI_LEARNING, max_items=max_results, max_days=max_days)
+# ==============================================================================
+# X (Twitter) Search & Viral Intelligence (Official API v2 + Resilient Fallback)
+# ==============================================================================
+
+def fetch_x_search(
+    query: str,
+    default_category: str = CATEGORY_AI_LEARNING,
+    max_items: int = 10,
+    max_days: int = 7,
+) -> list[NewsItem]:
+    """Fetches high-signal AI and developer posts from X (Twitter).
+    1. Attempts official X API v2 (Recent Search) if X_BEARER_TOKEN is configured.
+    2. Seamlessly falls back to Google News RSS indexer (site:x.com / site:twitter.com) if credits/keys are unavailable.
+    """
+    items: list[NewsItem] = []
+    bearer_token = os.getenv("X_BEARER_TOKEN") or os.getenv("TWITTER_BEARER_TOKEN")
+
+    # 1. Try Official X API v2 if Bearer Token is present
+    if bearer_token and bearer_token.strip() and not bearer_token.startswith("your_"):
+        try:
+            clean_q = query.strip()
+            # Standard recent search query
+            x_api_query = f"({clean_q}) -is:retweet lang:en"
+            if len(x_api_query) > 500:
+                x_api_query = f"{clean_q[:450]} -is:retweet"
+
+            url = "https://api.twitter.com/2/tweets/search/recent"
+            params = {
+                "query": x_api_query,
+                "max_results": min(max(max_items, 10), 50),
+                "tweet.fields": "created_at,public_metrics,author_id,text",
+                "expansions": "author_id",
+                "user.fields": "name,username",
+            }
+            headers = {
+                "Authorization": f"Bearer {bearer_token.strip()}",
+                "User-Agent": "LinkedInAgentPipeline/1.0",
+            }
+            with httpx.Client(timeout=DEFAULT_TIMEOUT) as client:
+                resp = client.get(url, params=params, headers=headers)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    tweets = data.get("data", [])
+                    users_map = {u["id"]: u for u in data.get("includes", {}).get("users", [])}
+
+                    for tw in tweets:
+                        created_at = tw.get("created_at")
+                        if not is_recent(created_at, max_days=max_days):
+                            continue
+
+                        text = tw.get("text", "").strip()
+                        if not text or not _is_relevant_developer_story(text):
+                            continue
+
+                        author_info = users_map.get(tw.get("author_id"), {})
+                        author_handle = author_info.get("username", "x")
+                        author_name = author_info.get("name", author_handle)
+
+                        tweet_id = tw.get("id")
+                        tweet_url = f"https://x.com/{author_handle}/status/{tweet_id}"
+
+                        metrics = tw.get("public_metrics", {})
+                        likes = metrics.get("like_count", 0)
+                        retweets = metrics.get("retweet_count", 0)
+
+                        first_line = text.split("\n")[0].strip()
+                        title = first_line[:140] if len(first_line) > 10 else text[:140]
+                        cat = _classify_story(title, text) or default_category
+
+                        items.append({
+                            "title": f"X (@{author_handle}): {title}",
+                            "url": tweet_url,
+                            "source": f"X (@{author_handle})",
+                            "summary": f"Discussion on X by {author_name} (@{author_handle}) [❤️ {likes} | 🔁 {retweets}]: {text[:350]}",
+                            "published": created_at,
+                            "category": cat,
+                            "relative_time": get_relative_time_str(created_at),
+                        })
+                    if items:
+                        logger.info("Fetched %d X posts via Official X API v2 for '%s'", len(items), query)
+                        return items
+                else:
+                    logger.info("Official X API returned status %d; falling back to Google-indexed X search.", resp.status_code)
+        except Exception as e:
+            logger.warning("Official X API search failed: %s; falling back to Google RSS.", e)
+
+    # 2. Resilient Fallback: Google-Indexed X / Twitter search (Zero credit cost)
+    try:
+        g_query = f"site:x.com {query}"
+        fallback_items = fetch_google_news_search(
+            query=g_query,
+            default_category=default_category,
+            max_items=max_items,
+            max_days=max_days,
+        )
+        for it in fallback_items:
+            it["source"] = "X (Twitter)"
+            items.append(it)
+        if items:
+            logger.info("Fetched %d X posts via Google RSS indexer for '%s'", len(items), query)
+    except Exception as e:
+        logger.warning("Google RSS X search failed for '%s': %s", query, e)
+
+    return items
 
 
 # ==============================================================================
@@ -562,6 +702,7 @@ def fetch_arxiv(max_results: int = 6, max_days: int = 7) -> list[NewsItem]:
 # ==============================================================================
 
 RANDOM_DEV_TOPICS = [
+    # AI & LLM Systems
     "AI agent loops and runaway token execution mistakes",
     "Model Context Protocol (MCP) server implementation and security",
     "RAG semantic chunking traps and retrieval failures",
@@ -571,12 +712,23 @@ RANDOM_DEV_TOPICS = [
     "Vector index tuning in pgvector and Qdrant under high concurrency",
     "FastAPI connection pool exhaustion during LLM streaming",
     "Evaluating LLMs in production: synthetic benchmarks vs real evals",
-    "Async Python event loop bottlenecks and blocking IO mistakes",
-    "PostgreSQL indexing anti-patterns and query planner surprises",
-    "Docker container security and privilege escalation pitfalls",
     "vLLM and TensorRT-LLM inference latency optimization",
-    "Distributed consensus and raft leader election edge cases",
-    "TypeScript type system mistakes and compile-time performance",
+
+    # Software Engineering, Languages & Systems
+    "eBPF in production: kernel observability and networking pitfalls",
+    "Distributed systems: Raft vs Paxos consensus and split-brain recovery",
+    "PostgreSQL MVCC, VACUUM bloat, and connection pooling at high scale",
+    "Rust memory safety, async runtimes (Tokio), and FFI traps",
+    "Golang goroutine leaks and channel deadlock anti-patterns",
+    "Low-latency event-driven architecture with Kafka and Redis Streams",
+    "DuckDB and columnar OLAP query engine architecture for analytics",
+    "Microservices vs Modular Monolith: real-world refactoring lessons",
+    "WebAssembly (WASM) and WebGPU for high-performance edge compute",
+    "Database connection pool starvation in async Python and Node.js",
+    "Docker container security and privilege escalation pitfalls",
+    "TypeScript type system mistakes and compile-time performance bottlenecks",
+    "Clean architecture, CQRS, and Domain-Driven Design in modern backends",
+    "Zero-trust API security, OAuth2 tokens, and mTLS implementation mistakes",
 ]
 
 
@@ -621,11 +773,8 @@ def fetch_by_topic(topic: str, mode: str | None = None, limit: int = 40) -> list
     news_items: list[NewsItem] = []
 
     # 1. Google News / Search Multi-Angle Queries (Expanded Sources: Forbes, Tom's Hardware, VentureBeat, TechCrunch, etc.)
-    # Angle A: Direct query (captures hot takes, 'Why Everyone is Talking About...')
     g_direct = fetch_google_news_search(clean_topic, max_items=12, max_days=14)
-    # Angle B: Developer / Architecture / What people want to hear (captures 'alternative to LLMs', '193x faster', 'benchmarks')
     g_dev = fetch_google_news_search(f"{search_query} AI benchmark architecture", max_items=10, max_days=14)
-    # Angle C: Pitfalls / Mistakes / Security (captures 'prompt injection risk', 'what everyone gets wrong')
     g_mistakes = fetch_google_news_search(f"{search_query} mistake pitfall security", default_category=CATEGORY_DEVELOPER_MISTAKE, max_items=8, max_days=14)
 
     for it in g_direct + g_dev:
@@ -638,7 +787,17 @@ def fetch_by_topic(topic: str, mode: str | None = None, limit: int = 40) -> list
 
     mistake_items.extend(g_mistakes)
 
-    # 2. Targeted HN Algolia searches
+    # 2. X (Twitter) Search for trending community debates and breakdowns
+    x_posts = fetch_x_search(search_query, max_items=8, max_days=14)
+    for it in x_posts:
+        if it["category"] == CATEGORY_DEVELOPER_MISTAKE:
+            mistake_items.append(it)
+        elif it["category"] == CATEGORY_AI_LEARNING:
+            learning_items.append(it)
+        else:
+            news_items.append(it)
+
+    # 3. Targeted HN Algolia searches
     mistake_queries = [f"{search_query} mistake", f"{search_query} pitfall", f"{search_query} postmortem"]
     for mq in mistake_queries[:2]:
         mistake_items.extend(search_hn_recent(mq, CATEGORY_DEVELOPER_MISTAKE, max_days=14, hits_per_page=8))
@@ -658,7 +817,7 @@ def fetch_by_topic(topic: str, mode: str | None = None, limit: int = 40) -> list
         else:
             news_items.append(it)
 
-    # 3. arXiv Search for cutting-edge technical papers (sorted by date descending)
+    # 4. arXiv Search for cutting-edge technical papers (sorted by date descending)
     try:
         encoded_arxiv = search_query.replace(" ", "+")
         arxiv_url = f"http://export.arxiv.org/api/query?search_query=all:{encoded_arxiv}&sortBy=submittedDate&sortOrder=descending&max_results=6"
@@ -667,7 +826,7 @@ def fetch_by_topic(topic: str, mode: str | None = None, limit: int = 40) -> list
     except Exception as e:
         logger.warning("arXiv search failed for '%s': %s", search_query, e)
 
-    # 4. Expanded Curated Engineering & Tech Feeds match
+    # 5. Expanded Curated Engineering & Tech Feeds match
     try:
         topic_words = set(search_query.lower().split())
         curated_sources = [
@@ -735,9 +894,9 @@ def fetch_all(
     deduplicate: bool = True,
 ) -> list[NewsItem]:
     """Runs developer-centric source fetchers, strictly prioritizing:
-    1. AI Developer Learning (architectures, agent protocols, tutorials)
+    1. AI Developer Learning (architectures, agent protocols, tutorials, X breakdowns)
     2. Developer Mistakes & Pitfalls (postmortems, anti-patterns, debugging)
-    3. Latest News & Model Releases (fresh announcements)
+    3. Latest News & Model Releases (fresh announcements, model benchmarks)
     """
     if topic:
         all_items = fetch_by_topic(topic, mode=mode)
@@ -747,18 +906,25 @@ def fetch_all(
         news_items: list[NewsItem] = []
 
         # -------------------------------------------------------------
-        # 1. AI DEVELOPER LEARNING (TOP PRIORITY)
+        # 1. DEVELOPER & AI LEARNING (TOP PRIORITY)
         # -------------------------------------------------------------
-        logger.info("Scanning for AI Developer Learning topics (Priority 1)...")
-        # Google News targeted queries for trending developer skills
-        learning_items.extend(fetch_google_news_search("AI agent architecture MCP RAG", default_category=CATEGORY_AI_LEARNING, max_items=10, max_days=5))
+        logger.info("Scanning for Software Development & AI Learning topics (Priority 1)...")
+        # Google News targeted queries for trending developer skills & software architecture
+        learning_items.extend(fetch_google_news_search("AI agent architecture MCP RAG", default_category=CATEGORY_AI_LEARNING, max_items=8, max_days=5))
+        learning_items.extend(fetch_google_news_search("software engineering architecture system design backend", default_category=CATEGORY_AI_LEARNING, max_items=8, max_days=5))
+        learning_items.extend(fetch_google_news_search("Rust Golang Python database performance benchmark", default_category=CATEGORY_AI_LEARNING, max_items=6, max_days=5))
 
-        # Hacker News targeted AI learning queries
-        for q in ["agent", "mcp", "rag", "local llm", "vllm", "structured outputs"]:
-            learning_items.extend(search_hn_recent(q, CATEGORY_AI_LEARNING, max_days=5, hits_per_page=6))
+        # X (Twitter) viral developer & AI engineering insights
+        learning_items.extend(fetch_x_search("AI agent architecture MCP RAG vLLM", default_category=CATEGORY_AI_LEARNING, max_items=6, max_days=5))
+        learning_items.extend(fetch_x_search("software engineering system design distributed systems backend", default_category=CATEGORY_AI_LEARNING, max_items=6, max_days=5))
+        learning_items.extend(fetch_x_search("Rust Golang TypeScript microservices database", default_category=CATEGORY_AI_LEARNING, max_items=6, max_days=5))
 
-        # Dev.to practical AI tutorials
-        learning_items.extend(fetch_dev_to(per_page=8, max_days=5))
+        # Hacker News targeted software development & AI learning queries
+        for q in ["agent", "mcp", "rag", "local llm", "system design", "distributed", "rust", "database", "compiler", "concurrency", "kubernetes"]:
+            learning_items.extend(search_hn_recent(q, CATEGORY_AI_LEARNING, max_days=5, hits_per_page=5))
+
+        # Dev.to practical software development & AI tutorials
+        learning_items.extend(fetch_dev_to(per_page=6, max_days=5))
 
         # Premier engineering publications & RSS
         learning_items.extend(fetch_rss_feed("https://feed.infoq.com/", "InfoQ Architecture", default_category=CATEGORY_AI_LEARNING, max_days=5))
@@ -770,18 +936,22 @@ def fetch_all(
         # -------------------------------------------------------------
         # 2. DEVELOPER MISTAKES, PITFALLS & POSTMORTEMS (HIGH PRIORITY)
         # -------------------------------------------------------------
-        logger.info("Scanning for Developer Mistakes & Pitfalls (Priority 2)...")
-        mistake_items.extend(fetch_google_news_search("software outage postmortem developer pitfall", default_category=CATEGORY_DEVELOPER_MISTAKE, max_items=8, max_days=7))
-        for q in ["mistake", "pitfall", "anti-pattern", "postmortem", "debugging"]:
-            mistake_items.extend(search_hn_recent(q, CATEGORY_DEVELOPER_MISTAKE, max_days=7, hits_per_page=6))
+        logger.info("Scanning for Software Engineering Pitfalls & Postmortems (Priority 2)...")
+        mistake_items.extend(fetch_google_news_search("software outage postmortem developer pitfall bug", default_category=CATEGORY_DEVELOPER_MISTAKE, max_items=8, max_days=7))
+        mistake_items.extend(fetch_google_news_search("database deadlock memory leak vulnerability postmortem", default_category=CATEGORY_DEVELOPER_MISTAKE, max_items=6, max_days=7))
+        mistake_items.extend(fetch_x_search("postmortem bug outage developer pitfall race condition", default_category=CATEGORY_DEVELOPER_MISTAKE, max_items=6, max_days=5))
+        for q in ["mistake", "pitfall", "anti-pattern", "postmortem", "debugging", "outage", "memory leak", "deadlock"]:
+            mistake_items.extend(search_hn_recent(q, CATEGORY_DEVELOPER_MISTAKE, max_days=7, hits_per_page=5))
 
         # -------------------------------------------------------------
-        # 3. LATEST NEWS & MODEL RELEASES (MODERATE PRIORITY)
+        # 3. LATEST TECH NEWS & RELEASES (MODERATE PRIORITY)
         # -------------------------------------------------------------
-        logger.info("Scanning for Latest AI News & Releases (Priority 3)...")
+        logger.info("Scanning for Latest Tech & Software Releases (Priority 3)...")
         news_items.extend(fetch_google_tech_headlines(max_items=10, max_days=3))
+        news_items.extend(fetch_x_search("DeepSeek Claude OpenAI Mistral", default_category=CATEGORY_LATEST_NEWS, max_items=5, max_days=4))
+        news_items.extend(fetch_x_search("software release open source framework compiler", default_category=CATEGORY_LATEST_NEWS, max_items=5, max_days=4))
         news_items.extend(fetch_rss_feed("https://techcrunch.com/category/artificial-intelligence/feed/", "TechCrunch AI", default_category=CATEGORY_LATEST_NEWS, max_days=4))
-        for q in ["deepseek", "claude", "mistral", "openai"]:
+        for q in ["deepseek", "claude", "mistral", "openai", "release", "show hn"]:
             news_items.extend(search_hn_recent(q, CATEGORY_LATEST_NEWS, max_days=4, hits_per_page=4))
 
         news_items.extend(fetch_hacker_news(limit=30, max_days=3))

@@ -207,11 +207,12 @@ class PipelineState(TypedDict):
 
 File: [`agents/fetcher.py`](file:///c:/Users/LENOVO/Desktop/Freelance/Projects/LinkedInPosts/agents/fetcher.py)
 
-Ingests news from multiple developer networks, filtering by age (< 48 hours) and categorizing them into three priority tiers:
+Ingests news from multiple developer networks (Google News Search, X/Twitter API v2 + Indexer, Hacker News Algolia, Dev.to REST API, arXiv, and curated RSS engineering blogs), filtering by recency and categorizing them into three priority tiers:
 
 - **Priority 1: AI Developer Learning**: Scans for practical implementations: Model Context Protocol (MCP), Retrieval-Augmented Generation (RAG), local LLMs (Ollama, llama.cpp), agentic workflows, vLLM inference optimization, and structured outputs.
 - **Priority 2: Developer Mistakes & Pitfalls**: Queries postmortems, architecture failures, memory leaks, security breaches, and anti-patterns.
 - **Priority 3: Model Releases & Benchmarks**: Tracks official updates from DeepSeek, Anthropic, Mistral, OpenAI, and Meta.
+- **X (Twitter) Intelligence**: Queries real-time tweets, community debates, and architectural threads using official X API v2 (with seamless Google RSS fallback).
 - **Deduplication Engine**: Calculates `hashlib.sha256(url.encode()).hexdigest()` and checks against `data/seen_stories.db` to prevent repetitive content.
 
 ---
